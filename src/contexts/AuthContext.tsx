@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, supabasePublic } from '@/integrations/supabase/client';
+import { supabase, supabaseAuth, supabasePublic } from '@/integrations/supabase/client';
 
 interface UserProfile {
   full_name: string;
@@ -68,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       setIsAdmin(role === 'admin' || role === 'manager');
     } catch (e) {
+      console.error('loadProfile error:', e);
       setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false });
     } finally {
       setLoading(false);
@@ -75,8 +76,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const timeout = setTimeout(() => setLoading(false), 5000);
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const timeout = setTimeout(() => setLoading(false), 8000);
+
+    // supabaseAuth (bez schema override) — poprawna obsługa sesji OAuth
+    const { data: { subscription } } = supabaseAuth.auth.onAuthStateChange((_event, newSession) => {
       clearTimeout(timeout);
       setSession(newSession);
       setUser(newSession?.user ?? null);
@@ -88,20 +91,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     });
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (!s) setLoading(false);
+
+    supabaseAuth.auth.getSession().then(({ data: { session: s } }) => {
+      if (!s) {
+        clearTimeout(timeout);
+        setLoading(false);
+      }
     });
+
     return () => { clearTimeout(timeout); subscription.unsubscribe(); };
   }, []);
 
   const signInWithAzure = async () => {
-    await supabase.auth.signInWithOAuth({
+    await supabaseAuth.auth.signInWithOAuth({
       provider: 'azure',
-      options: { redirectTo: window.location.origin + '/jobs', scopes: 'openid profile email' },
+      options: {
+        redirectTo: window.location.origin + '/jobs',
+        scopes: 'openid profile email',
+      },
     });
   };
 
-  const signOut = async () => { await supabase.auth.signOut(); };
+  const signOut = async () => {
+    await supabaseAuth.auth.signOut();
+  };
 
   return (
     <AuthContext.Provider value={{ session, user, profile, isAdmin, loading, signInWithAzure, signOut }}>
