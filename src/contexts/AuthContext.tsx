@@ -1,18 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { createClient } from '@supabase/supabase-js';
-
-const supabasePublic = createClient(
-  "https://opdpjplccytlzadjpdsd.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wZHBqcGxjY3l0bHphZGpwZHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzMDMwMTIsImV4cCI6MjA3Njg3OTAxMn0.-E7lNQ_tMRPg7ImwNgJIJa1WSUZOJLp_glmWtFix7VE",
-  { db: { schema: 'public' } }
-);
+import { supabase, supabasePublic } from '@/integrations/supabase/client';
 
 interface UserProfile {
   full_name: string;
   email: string;
-  role: string;
+  role: 'admin' | 'manager' | 'recruiter' | 'viewer';
   has_hr_access: boolean;
   avatar_url?: string;
 }
@@ -36,33 +29,46 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession]   = useState<Session | null>(null);
+  const [user, setUser]         = useState<User | null>(null);
+  const [profile, setProfile]   = useState<UserProfile | null>(null);
+  const [isAdmin, setIsAdmin]   = useState(false);
+  const [loading, setLoading]   = useState(true);
 
   const loadProfile = async (userId: string, email: string) => {
     try {
+      // KROK 1 — sanity check: czy pracownik aktywny?
       const { data: member } = await supabasePublic
         .from('team_members_public')
-        .select('full_name, avatar_url, role, active')
+        .select('full_name, avatar_url, active')
         .eq('auth_user_id', userId)
         .maybeSingle();
 
-      const hasAccess = !!member && member.active === true;
-      const role = member?.role ?? 'user';
+      if (!member || member.active !== true) {
+        setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false });
+        return;
+      }
+
+      // KROK 2 — rola z hr.hr_user_access
+      const { data: accessData } = await supabase
+        .from('hr_user_access')
+        .select('role, active')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+
+      const hasHrAccess = !!accessData && accessData.active === true;
+      const role = (hasHrAccess ? accessData.role : 'viewer') as UserProfile['role'];
 
       setProfile({
-        full_name: member?.full_name || email.split('@')[0],
+        full_name:     member.full_name || email.split('@')[0],
         email,
-        avatar_url: member?.avatar_url ?? undefined,
+        avatar_url:    member.avatar_url ?? undefined,
         role,
-        has_hr_access: hasAccess,
+        has_hr_access: hasHrAccess,
       });
       setIsAdmin(role === 'admin' || role === 'manager');
     } catch (e) {
-      setProfile({ full_name: email.split('@')[0], email, role: 'user', has_hr_access: false });
+      setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false });
     } finally {
       setLoading(false);
     }
