@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseAuth } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -20,10 +20,11 @@ const Login = () => {
   }
 
   const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    await supabaseAuth.auth.signInWithOAuth({
       provider: 'azure',
       options: {
         redirectTo: window.location.origin + '/jobs',
+        scopes: 'openid profile email',
       },
     });
   };
