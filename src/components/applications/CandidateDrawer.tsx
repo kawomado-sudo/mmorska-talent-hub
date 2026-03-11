@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { hrApi } from '@/lib/hr-api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -35,39 +35,25 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
   const { data: statusHistory } = useQuery({
     queryKey: ['status-history', application?.id],
-    queryFn: async () => {
-      if (!application) return [];
-      const { data, error } = await supabase
-        .from('application_status_log')
-        .select('*')
-        .eq('application_id', application.id)
-        .order('changed_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => hrApi('list_status_log', { application_id: application.id }),
     enabled: !!application,
   });
 
   const statusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
       const oldStatus = application.status;
-      // Update application
-      const { error: updateError } = await supabase
-        .from('applications')
-        .update({ status: newStatus, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq('id', application.id);
-      if (updateError) throw updateError;
-
-      // Insert status log
-      const { error: logError } = await supabase
-        .from('application_status_log')
-        .insert({
-          application_id: application.id,
-          old_status: oldStatus,
-          new_status: newStatus,
-          changed_by: user?.id,
-        });
-      if (logError) throw logError;
+      await hrApi('update_application', {
+        id: application.id,
+        status: newStatus,
+        reviewed_by: user?.id,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      await hrApi('insert_status_log', {
+        application_id: application.id,
+        old_status: oldStatus,
+        new_status: newStatus,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
@@ -79,13 +65,12 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   });
 
   const notesMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from('applications')
-        .update({ recruiter_notes: notes, updated_at: new Date().toISOString() })
-        .eq('id', application.id);
-      if (error) throw error;
-    },
+    mutationFn: () =>
+      hrApi('update_application', {
+        id: application.id,
+        recruiter_notes: notes,
+        updated_at: new Date().toISOString(),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
       toast.success('Notatki zapisane');
@@ -102,13 +87,11 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
         </SheetHeader>
 
         <div className="mt-4 space-y-5">
-          {/* Contact */}
           <div className="space-y-1 text-sm">
             <div><span className="text-muted-foreground">Email:</span> {application.email}</div>
             {application.phone && <div><span className="text-muted-foreground">Telefon:</span> {application.phone}</div>}
           </div>
 
-          {/* CV */}
           {(application.cv_url || application.cv_link) && (
             <div>
               {application.cv_link ? (
@@ -129,7 +112,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
           <Separator />
 
-          {/* Cover letter */}
           {application.cover_letter && (
             <div>
               <h3 className="mb-2 text-sm font-medium">List motywacyjny</h3>
@@ -139,7 +121,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
             </div>
           )}
 
-          {/* AI Summary */}
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium">
               <Sparkles className="h-4 w-4 text-primary" />
@@ -152,7 +133,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
           <Separator />
 
-          {/* Notes */}
           <div>
             <h3 className="mb-2 text-sm font-medium">Notatki rekrutera</h3>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
@@ -163,7 +143,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
           <Separator />
 
-          {/* Status actions */}
           <div>
             <h3 className="mb-2 text-sm font-medium">Zmień status</h3>
             <div className="flex flex-wrap gap-2">
@@ -182,7 +161,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
             </div>
           </div>
 
-          {/* Status history */}
           {statusHistory && statusHistory.length > 0 && (
             <div>
               <h3 className="mb-2 text-sm font-medium">Historia statusów</h3>
