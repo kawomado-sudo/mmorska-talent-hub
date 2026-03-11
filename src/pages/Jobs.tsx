@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { hrApi } from '@/lib/hr-api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Plus, Pencil, Trash2, Users, Calendar, Briefcase } from 'lucide-react';
 import { JobFormDialog } from '@/components/jobs/JobFormDialog';
 import { toast } from 'sonner';
@@ -46,35 +45,11 @@ const Jobs = () => {
 
   const { data: jobs, isLoading } = useQuery({
     queryKey: ['jobs'],
-    queryFn: async () => {
-      const { data: jobsData, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-
-      const { data: counts, error: countError } = await supabase
-        .from('applications')
-        .select('job_id');
-      if (countError) throw countError;
-
-      const countMap: Record<string, number> = {};
-      counts?.forEach((a: any) => {
-        countMap[a.job_id] = (countMap[a.job_id] || 0) + 1;
-      });
-
-      return (jobsData as Job[]).map((j) => ({
-        ...j,
-        application_count: countMap[j.id] || 0,
-      }));
-    },
+    queryFn: () => hrApi<Job[]>('list_jobs'),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('jobs').delete().eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => hrApi('delete_job', { id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Ogłoszenie usunięte');
@@ -107,7 +82,6 @@ const Jobs = () => {
         </Button>
       </div>
 
-      {/* Status filter */}
       <div className="mb-6 flex flex-wrap gap-2">
         {statusFilters.map((s) => (
           <Button

@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { hrApi } from '@/lib/hr-api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Upload, FileUp, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileUp, Loader2 } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
 import { toast } from 'sonner';
 
@@ -45,22 +46,12 @@ const Applications = () => {
 
   const { data: job } = useQuery({
     queryKey: ['job', jobId],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('jobs').select('*').eq('id', jobId!).single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => hrApi('get_job', { id: jobId }),
   });
 
   const { data: applications, isLoading } = useQuery({
     queryKey: ['applications', jobId, filter],
-    queryFn: async () => {
-      let query = supabase.from('applications').select('*').eq('job_id', jobId!).order('created_at', { ascending: false });
-      if (filter !== 'all') query = query.eq('status', filter);
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => hrApi('list_applications', { job_id: jobId, status: filter }),
   });
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -81,7 +72,6 @@ const Applications = () => {
         .upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      // Call parse-cv edge function
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-cv`,
         {
@@ -131,7 +121,6 @@ const Applications = () => {
         <h1 className="text-2xl font-bold">{job?.title || 'Kandydatury'}</h1>
       </div>
 
-      {/* CV Upload zone */}
       <div
         className={`mb-6 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
           dragOver ? 'border-primary bg-primary/5' : 'border-border'
@@ -160,7 +149,6 @@ const Applications = () => {
         )}
       </div>
 
-      {/* Status filters */}
       <div className="mb-4 flex flex-wrap gap-2">
         {statusFilters.map((s) => (
           <Button
