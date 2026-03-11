@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Upload, FileUp, Loader2 } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
+import { toast } from 'sonner';
 
 const statusFilters = [
   { value: 'all', label: 'Wszystkie' },
@@ -25,11 +27,21 @@ const statusBadge: Record<string, { label: string; className: string }> = {
   rejected: { label: 'Odrzucone', className: 'bg-red-900/50 text-red-400 border-red-800' },
 };
 
+const ratingColor = (rating: number | null) => {
+  if (!rating) return 'text-muted-foreground';
+  if (rating >= 75) return 'text-emerald-400';
+  if (rating >= 50) return 'text-yellow-400';
+  return 'text-red-400';
+};
+
 const Applications = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState('all');
   const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   const { data: job } = useQuery({
     queryKey: ['job', jobId],
@@ -51,6 +63,65 @@ const Applications = () => {
     },
   });
 
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (file.type !== 'application/pdf') {
+      toast.error('Dozwolone są tylko pliki PDF');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Plik nie może być większy niż 10 MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const filePath = `${jobId}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('hr-cv')
+        .upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      // Call parse-cv edge function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-cv`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ job_id: jobId, cv_storage_path: filePath }),
+        }
+      );
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Błąd parsowania CV');
+      }
+
+      toast.success('CV przesłane i przeanalizowane przez AI');
+      queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Nie udało się przesłać CV');
+    } finally {
+      setUploading(false);
+    }
+  }, [jobId, queryClient]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileUpload(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -60,6 +131,36 @@ const Applications = () => {
         <h1 className="text-2xl font-bold">{job?.title || 'Kandydatury'}</h1>
       </div>
 
+      {/* CV Upload zone */}
+      <div
+        className={`mb-6 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+          dragOver ? 'border-primary bg-primary/5' : 'border-border'
+        } ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
+        {uploading ? (
+          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Przetwarzanie CV przez AI...
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <FileUp className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Przeciągnij plik CV (PDF) lub{' '}
+              <label className="cursor-pointer text-primary underline underline-offset-2">
+                wybierz z dysku
+                <input type="file" accept=".pdf" className="hidden" onChange={handleFileInput} />
+              </label>
+            </p>
+            <p className="text-xs text-muted-foreground">AI automatycznie wyciągnie dane i oceni dopasowanie</p>
+          </div>
+        )}
+      </div>
+
+      {/* Status filters */}
       <div className="mb-4 flex flex-wrap gap-2">
         {statusFilters.map((s) => (
           <Button
@@ -84,6 +185,7 @@ const Applications = () => {
                 <TableHead>Email</TableHead>
                 <TableHead>Data aplikacji</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Dopasowanie AI</TableHead>
                 <TableHead>AI Summary</TableHead>
               </TableRow>
             </TableHeader>
@@ -98,6 +200,18 @@ const Applications = () => {
                       {statusBadge[app.status]?.label || app.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {app.ai_rating != null ? (
+                      <div className="flex items-center gap-2">
+                        <Progress value={app.ai_rating} className="h-2 w-16" />
+                        <span className={`text-xs font-medium ${ratingColor(app.ai_rating)}`}>
+                          {app.ai_rating}%
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">
                     {app.ai_summary ? app.ai_summary.substring(0, 80) + (app.ai_summary.length > 80 ? '…' : '') : '—'}
                   </TableCell>
@@ -105,8 +219,8 @@ const Applications = () => {
               ))}
               {applications?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                    Brak kandydatur.
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    Brak kandydatur. Prześlij CV aby dodać kandydata.
                   </TableCell>
                 </TableRow>
               )}
