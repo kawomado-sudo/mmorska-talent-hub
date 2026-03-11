@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_user_profiles: {
+        Row: {
+          agent_email: string
+          agent_id: number
+          created_at: string
+          first_name: string
+          last_name: string
+          last_synced_at: string
+          password_set_at: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_email: string
+          agent_id: number
+          created_at?: string
+          first_name?: string
+          last_name?: string
+          last_synced_at?: string
+          password_set_at?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_email?: string
+          agent_id?: number
+          created_at?: string
+          first_name?: string
+          last_name?: string
+          last_synced_at?: string
+          password_set_at?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       agents_orders_direct_queue: {
         Row: {
           added_time: string | null
@@ -22,6 +61,8 @@ export type Database = {
           address_zip: string | null
           agent_email: string
           assigned_to: string | null
+          attachments_files: Json | null
+          attachments_folder_path: string | null
           bandera: string | null
           boat_hin: string | null
           boat_homeport: string | null
@@ -94,6 +135,8 @@ export type Database = {
           address_zip?: string | null
           agent_email: string
           assigned_to?: string | null
+          attachments_files?: Json | null
+          attachments_folder_path?: string | null
           bandera?: string | null
           boat_hin?: string | null
           boat_homeport?: string | null
@@ -166,6 +209,8 @@ export type Database = {
           address_zip?: string | null
           agent_email?: string
           assigned_to?: string | null
+          attachments_files?: Json | null
+          attachments_folder_path?: string | null
           bandera?: string | null
           boat_hin?: string | null
           boat_homeport?: string | null
@@ -2026,6 +2071,28 @@ export type Database = {
       cost_is_admin_or_manager: { Args: never; Returns: boolean }
       cost_is_admin_or_manager_with_access: { Args: never; Returns: boolean }
       current_user_is_team_member: { Args: never; Returns: boolean }
+      edge_agent_email_exists: { Args: { p_email: string }; Returns: boolean }
+      edge_agents_count: { Args: never; Returns: number }
+      edge_get_agent_by_email: {
+        Args: { p_email: string }
+        Returns: {
+          agent_email: string
+          agent_first_name: string
+          agent_last_name: string
+          agent_phone: string
+          commission_based: string
+          id: number
+        }[]
+      }
+      edge_update_agent_profile: {
+        Args: {
+          p_agent_id: number
+          p_first_name: string
+          p_last_name: string
+          p_phone: string
+        }
+        Returns: undefined
+      }
       get_agents_directory: {
         Args: never
         Returns: {
