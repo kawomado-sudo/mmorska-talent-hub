@@ -1,70 +1,59 @@
-## MMorska — Wewnętrzny Panel Rekrutera
 
-### Przegląd
 
-Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
+## Problem
 
-### Konfiguracja
+Schema `hr` nie jest w Exposed Schemas PostgREST, wiec klient Supabase z `db: { schema: 'hr' }` nie moze odpytywac tabel `hr.jobs` ani `hr.applications` z frontendu. Tabele istnieja, ale sa niedostepne dla API REST.
 
-1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
-2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
-3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
-4. **Font Inter** — import z Google Fonts
+## Rozwiazanie: Edge function `hr-api`
 
-### Autoryzacja
+Jedna edge function `hr-api` jako proxy do schematu `hr`, uzywajaca `service_role_key`. Frontend wywoluje ja zamiast bezposrednich zapytan.
 
-- `AuthProvider` context z `onAuthStateChange` + `getSession`
-- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
-- `ProtectedRoute` component — brak sesji → redirect `/login`
-- Przycisk wylogowania w sidebarze
+### Edge function `hr-api`
 
-### Strona `/login`
+Obsluguje akcje przez parametr `action`:
 
-- Wyśrodkowane logo MMorska na ciemnym tle
-- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
-- Brak pól email/hasło
+| Action | Opis |
+|---|---|
+| `list_jobs` | SELECT * FROM hr.jobs + count applications |
+| `get_job` | SELECT single job by id |
+| `create_job` | INSERT INTO hr.jobs |
+| `update_job` | UPDATE hr.jobs WHERE id = ... |
+| `delete_job` | DELETE FROM hr.jobs WHERE id = ... |
+| `list_applications` | SELECT * FROM hr.applications WHERE job_id = ... |
+| `get_application` | SELECT single application by id |
+| `update_application` | UPDATE hr.applications (status, notes) |
 
-### Layout z Sidebarem
+Edge function weryfikuje JWT recznie (z headera Authorization) i uzywa `service_role_key` do zapytan.
 
-- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
-- Przycisk "Wyloguj" na dole
-- Kompaktowy, profesjonalny design
+### Zmiany w frontendzie
 
-### Strona `/jobs` — Ogłoszenia
+1. **Nowy helper** `src/lib/hr-api.ts` — wrapper do wywolywania edge function:
+```typescript
+export async function hrApi(action: string, params?: any) {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/hr-api`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });
+  return response.json();
+}
+```
 
-- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
-- Przycisk "Nowe ogłoszenie" → modal z formularzem
-- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
-- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
-- Liczba kandydatur pobierana z `hr.applications` (count per job)
+2. **Jobs.tsx** — zamiana `supabase.from('jobs')` na `hrApi('list_jobs')`, `hrApi('delete_job', { id })`
 
-### Strona `/jobs/:id/applications` — Kandydatury
+3. **JobFormDialog.tsx** — zamiana insert/update na `hrApi('create_job', payload)` / `hrApi('update_job', { id, ...payload })`; zamiana pol Obowiazki/Wymagania na Textarea (jeden na kazde)
 
-- Nagłówek z nazwą stanowiska + link powrotny
-- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
-- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
-- Kliknięcie wiersza → drawer boczny
+4. **Applications.tsx** — zamiana `supabase.from('applications')` na `hrApi('list_applications', { job_id })`, `hrApi('get_job', { id })`
 
-### Drawer kandydata
+5. **CandidateDrawer.tsx** — zamiana update na `hrApi('update_application', { id, ... })`
 
-- Dane kontaktowe: imię, nazwisko, email, telefon
-- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
-- List motywacyjny (przewijany)
-- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
-- Edytowalne pole "Notatki rekrutera" z zapisem inline
-- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
-- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
-- Historia statusów — chronologiczna lista zmian
+6. **Klient supabase** — usunac klienta `supabase` (schema hr) bo nie jest juz potrzebny; zostaje `supabaseAuth` i `supabasePublic`
 
-### Strona `/settings` — Ustawienia formularza
+### Parse-cv edge function
 
-- Formularz z polami z `hr.form_config` (klucz-wartość)
-- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
-- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
+Juz dziala poprawnie — uzywa `service_role_key` z `db: { schema: 'hr' }`, wiec nie wymaga zmian.
 
-### Ważne szczegóły techniczne
+### Config
 
-- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
-- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
-- Brak jakiegokolwiek email/password auth w kodzie
-- Status change = UPDATE + INSERT log (atomowo)
+Dodac `hr-api` do `supabase/config.toml` z `verify_jwt = false` (weryfikacja reczna w kodzie).
+
