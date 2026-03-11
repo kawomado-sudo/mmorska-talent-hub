@@ -2003,6 +2003,7 @@ export type Database = {
       }
     }
     Functions: {
+      agent_email_exists: { Args: { p_email: string }; Returns: boolean }
       cost_contractor_stats: {
         Args: { p_contractor_id: string }
         Returns: {
@@ -2025,7 +2026,25 @@ export type Database = {
       cost_is_admin_or_manager: { Args: never; Returns: boolean }
       cost_is_admin_or_manager_with_access: { Args: never; Returns: boolean }
       current_user_is_team_member: { Args: never; Returns: boolean }
+      get_agents_directory: {
+        Args: never
+        Returns: {
+          agent_email: string
+          agent_first_name: string
+          agent_last_name: string
+          agent_phone: string
+        }[]
+      }
       get_app_role: { Args: { p_app_slug: string }; Returns: string }
+      get_current_agent_profile: {
+        Args: never
+        Returns: {
+          agent_email: string
+          agent_first_name: string
+          agent_last_name: string
+          agent_phone: string
+        }[]
+      }
       has_app_access: { Args: { p_app_slug: string }; Returns: boolean }
       has_role:
         | {
