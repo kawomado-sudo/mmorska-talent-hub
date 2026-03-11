@@ -1,72 +1,70 @@
+## MMorska — Wewnętrzny Panel Rekrutera
 
+### Przegląd
 
-## Analiza obecnego stanu
+Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
 
-**Strona `/jobs` jest powiazana z tabelą `hr.jobs`** -- ale schemat `hr` nie istnieje w Supabase. Tabele `hr.jobs`, `hr.applications`, `hr.application_status_log`, `hr.form_config` i `hr.hr_user_access` nie zostaly jeszcze utworzone. Klient Supabase (`supabase`) jest skonfigurowany na `schema: 'hr'`, wiec wszystkie zapytania trafiaja w pustkę.
+### Konfiguracja
 
-Takze nie ma bucketa storage na pliki CV.
+1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
+2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
+3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
+4. **Font Inter** — import z Google Fonts
 
-## Plan implementacji
+### Autoryzacja
 
-### 1. Utworzenie schematu `hr` i tabel w Supabase
+- `AuthProvider` context z `onAuthStateChange` + `getSession`
+- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
+- `ProtectedRoute` component — brak sesji → redirect `/login`
+- Przycisk wylogowania w sidebarze
 
-Migracja SQL tworząca:
-- `CREATE SCHEMA IF NOT EXISTS hr;`
-- Dodanie `hr` do exposed schemas (wymaga ręcznej konfiguracji w Supabase Dashboard)
-- `hr.jobs` — id (uuid PK), title, department, description, responsibilities (text[]), requirements (text[]), status (text, default 'draft'), created_by (uuid), created_at, published_at, closed_at
-- `hr.applications` — id (uuid PK), job_id (FK -> hr.jobs), first_name, last_name, email, phone, cover_letter, cv_url, cv_link, status (text, default 'new'), ai_summary, ai_rating (integer, 0-100), recruiter_notes, reviewed_by, reviewed_at, created_at, updated_at
-- `hr.application_status_log` — id, application_id (FK), old_status, new_status, changed_by, changed_at, note
-- `hr.form_config` — id, key (unique), value, updated_at
-- RLS policies (authenticated users full CRUD)
-- Storage bucket `hr-cvs` do uploadowania plików CV
+### Strona `/login`
 
-### 2. Przebudowa `/jobs` na dashboard z kafelkami
+- Wyśrodkowane logo MMorska na ciemnym tle
+- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
+- Brak pól email/hasło
 
-Zamiast tabeli — grid kafelków (Card) z:
-- Nazwa stanowiska (title)
-- Dział (department)
-- Badge statusu (draft/active/closed) z kolorami
-- Liczba kandydatur
-- Data utworzenia
-- Przycisk edycji/usunięcia
-- Kliknięcie kafelka → `/jobs/:id/applications`
+### Layout z Sidebarem
 
-Tylko ogłoszenia z `status = 'active'` wyświetlane domyślnie, z filtrem na inne statusy.
+- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
+- Przycisk "Wyloguj" na dole
+- Kompaktowy, profesjonalny design
 
-### 3. Przebudowa `/jobs/:id/applications` — upload CV z AI
+### Strona `/jobs` — Ogłoszenia
 
-Dodanie strefy drag & drop / przycisku uploadu pliku PDF:
-- Plik trafia do bucketa `hr-cvs` w Supabase Storage
-- Po uploadzie → wywołanie edge function `parse-cv` (Gemini API)
-- Edge function:
-  - Pobiera PDF z storage
-  - Wysyła do Google Gemini API z promptem: "Wyciągnij dane kandydata (imię, nazwisko, email, telefon) i oceń dopasowanie do stanowiska [opis z hr.jobs] w skali 0-100"
-  - Zwraca JSON: `{ first_name, last_name, email, phone, ai_summary, ai_rating }`
-- Tworzenie nowego rekordu w `hr.applications` z wyciągniętymi danymi
-- Wyświetlenie ratingu dopasowania jako badge/progress bar na liście
+- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
+- Przycisk "Nowe ogłoszenie" → modal z formularzem
+- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
+- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
+- Liczba kandydatur pobierana z `hr.applications` (count per job)
 
-### 4. Edge function `parse-cv`
+### Strona `/jobs/:id/applications` — Kandydatury
 
-```text
-supabase/functions/parse-cv/index.ts
-```
+- Nagłówek z nazwą stanowiska + link powrotny
+- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
+- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
+- Kliknięcie wiersza → drawer boczny
 
-- Przyjmuje: `{ job_id, cv_storage_path }`
-- Pobiera opis stanowiska z `hr.jobs`
-- Pobiera plik PDF z storage
-- Wysyła do Gemini API (klucz użytkownika przechowywany w Supabase Secrets)
-- Zwraca sparsowane dane + rating
-- Tworzy rekord w `hr.applications`
+### Drawer kandydata
 
-### 5. Klucz Gemini API
+- Dane kontaktowe: imię, nazwisko, email, telefon
+- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
+- List motywacyjny (przewijany)
+- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
+- Edytowalne pole "Notatki rekrutera" z zapisem inline
+- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
+- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
+- Historia statusów — chronologiczna lista zmian
 
-Użytkownik posiada własny klucz Google Gemini. Trzeba go dodać jako secret `GOOGLE_GEMINI_API_KEY` w Supabase.
+### Strona `/settings` — Ustawienia formularza
 
-### Szczegóły techniczne
+- Formularz z polami z `hr.form_config` (klucz-wartość)
+- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
+- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
 
-- **Schemat hr** — musi być dodany do Exposed Schemas w Supabase Dashboard ręcznie
-- **Klient Supabase** — `supabase` (schema: 'hr') do tabel HR, `supabaseAuth` do auth — bez zmian
-- **Upload CV** — react-dropzone lub natywny input type=file, upload do `hr-cvs` bucket
-- **Gemini API** — wywoływana przez edge function, nie z frontendu (bezpieczeństwo klucza)
-- **Rating AI** — nowa kolumna `ai_rating` (integer) w `hr.applications`
+### Ważne szczegóły techniczne
 
+- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
+- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
+- Brak jakiegokolwiek email/password auth w kodzie
+- Status change = UPDATE + INSERT log (atomowo)

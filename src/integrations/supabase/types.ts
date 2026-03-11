@@ -395,6 +395,10 @@ export type Database = {
       B2Bapp_incoming_orders_queue: {
         Row: {
           added_time: string | null
+          additional_services:
+            | Database["public"]["Enums"]["additional_service_enum"][]
+            | null
+          additional_services_total_eur: number | null
           address_city: string | null
           address_street: string | null
           address_zip: string | null
@@ -416,11 +420,11 @@ export type Database = {
           customer_phone: string | null
           date_reg: string | null
           draft: string | null
-          drive: string[] | null
+          drive: Database["public"]["Enums"]["b2b_main_drive_enum"][] | null
           firma: string | null
           fuel: string[] | null
           hin_ini: string | null
-          homeport: string | null
+          homeport: Database["public"]["Enums"]["b2b_homeport_enum"] | null
           hull_1: string | null
           id: number
           imie: string | null
@@ -428,15 +432,19 @@ export type Database = {
           kw_engine: string | null
           length: string | null
           make_model: string | null
-          material: string | null
+          material: Database["public"]["Enums"]["b2b_hull_material_enum"] | null
           nazwisko: string | null
           new_registration_number: string | null
           notes: string | null
           operator: string | null
+          operator_designated: boolean | null
+          operator_details: string | null
           order_date: string | null
           order_status:
             | Database["public"]["Enums"]["infinity_status_enum"]
             | null
+          owner_country: string | null
+          owner_type: Database["public"]["Enums"]["owner_details_enum"] | null
           payment_method: string | null
           payment_status:
             | Database["public"]["Enums"]["payment_status_enum"]
@@ -450,7 +458,7 @@ export type Database = {
           service_type: string | null
           shipper: string | null
           shipping_status: string | null
-          shipyard: string | null
+          shipyard: Database["public"]["Enums"]["b2b_producer_enum"] | null
           street: string | null
           submission_id: string
           telefon: string | null
@@ -467,6 +475,10 @@ export type Database = {
         }
         Insert: {
           added_time?: string | null
+          additional_services?:
+            | Database["public"]["Enums"]["additional_service_enum"][]
+            | null
+          additional_services_total_eur?: number | null
           address_city?: string | null
           address_street?: string | null
           address_zip?: string | null
@@ -488,11 +500,11 @@ export type Database = {
           customer_phone?: string | null
           date_reg?: string | null
           draft?: string | null
-          drive?: string[] | null
+          drive?: Database["public"]["Enums"]["b2b_main_drive_enum"][] | null
           firma?: string | null
           fuel?: string[] | null
           hin_ini?: string | null
-          homeport?: string | null
+          homeport?: Database["public"]["Enums"]["b2b_homeport_enum"] | null
           hull_1?: string | null
           id: number
           imie?: string | null
@@ -500,15 +512,21 @@ export type Database = {
           kw_engine?: string | null
           length?: string | null
           make_model?: string | null
-          material?: string | null
+          material?:
+            | Database["public"]["Enums"]["b2b_hull_material_enum"]
+            | null
           nazwisko?: string | null
           new_registration_number?: string | null
           notes?: string | null
           operator?: string | null
+          operator_designated?: boolean | null
+          operator_details?: string | null
           order_date?: string | null
           order_status?:
             | Database["public"]["Enums"]["infinity_status_enum"]
             | null
+          owner_country?: string | null
+          owner_type?: Database["public"]["Enums"]["owner_details_enum"] | null
           payment_method?: string | null
           payment_status?:
             | Database["public"]["Enums"]["payment_status_enum"]
@@ -522,7 +540,7 @@ export type Database = {
           service_type?: string | null
           shipper?: string | null
           shipping_status?: string | null
-          shipyard?: string | null
+          shipyard?: Database["public"]["Enums"]["b2b_producer_enum"] | null
           street?: string | null
           submission_id: string
           telefon?: string | null
@@ -539,6 +557,10 @@ export type Database = {
         }
         Update: {
           added_time?: string | null
+          additional_services?:
+            | Database["public"]["Enums"]["additional_service_enum"][]
+            | null
+          additional_services_total_eur?: number | null
           address_city?: string | null
           address_street?: string | null
           address_zip?: string | null
@@ -560,11 +582,11 @@ export type Database = {
           customer_phone?: string | null
           date_reg?: string | null
           draft?: string | null
-          drive?: string[] | null
+          drive?: Database["public"]["Enums"]["b2b_main_drive_enum"][] | null
           firma?: string | null
           fuel?: string[] | null
           hin_ini?: string | null
-          homeport?: string | null
+          homeport?: Database["public"]["Enums"]["b2b_homeport_enum"] | null
           hull_1?: string | null
           id?: number
           imie?: string | null
@@ -572,15 +594,21 @@ export type Database = {
           kw_engine?: string | null
           length?: string | null
           make_model?: string | null
-          material?: string | null
+          material?:
+            | Database["public"]["Enums"]["b2b_hull_material_enum"]
+            | null
           nazwisko?: string | null
           new_registration_number?: string | null
           notes?: string | null
           operator?: string | null
+          operator_designated?: boolean | null
+          operator_details?: string | null
           order_date?: string | null
           order_status?:
             | Database["public"]["Enums"]["infinity_status_enum"]
             | null
+          owner_country?: string | null
+          owner_type?: Database["public"]["Enums"]["owner_details_enum"] | null
           payment_method?: string | null
           payment_status?:
             | Database["public"]["Enums"]["payment_status_enum"]
@@ -594,7 +622,7 @@ export type Database = {
           service_type?: string | null
           shipper?: string | null
           shipping_status?: string | null
-          shipyard?: string | null
+          shipyard?: Database["public"]["Enums"]["b2b_producer_enum"] | null
           street?: string | null
           submission_id?: string
           telefon?: string | null
@@ -1792,15 +1820,15 @@ export type Database = {
       }
       cost_user_roles: {
         Row: {
-          role: string | null
+          role: Database["public"]["Enums"]["app_role"] | null
           user_id: string | null
         }
         Insert: {
-          role?: never
+          role?: Database["public"]["Enums"]["app_role"] | null
           user_id?: string | null
         }
         Update: {
-          role?: never
+          role?: Database["public"]["Enums"]["app_role"] | null
           user_id?: string | null
         }
         Relationships: []
@@ -2026,7 +2054,35 @@ export type Database = {
       parse_polish_date: { Args: { date_text: string }; Returns: string }
     }
     Enums: {
+      additional_service_enum: "mmsi" | "express_registration"
       app_role: "manager" | "admin" | "user" | "viewer"
+      b2b_homeport_enum:
+        | "Gdynia"
+        | "Gdańsk"
+        | "Szczecin"
+        | "Kołobrzeg"
+        | "Świnoujście"
+        | "DUMMY_HOMEPORT"
+      b2b_hull_material_enum:
+        | "GRP"
+        | "Aluminum"
+        | "Steel"
+        | "Wood"
+        | "Other"
+        | "DUMMY_MATERIAL"
+      b2b_main_drive_enum:
+        | "sail_drive"
+        | "motor_drive"
+        | "skijet"
+        | "dummy_drive"
+      b2b_producer_enum:
+        | "BENETEAU"
+        | "BAVARIA"
+        | "JEANNEAU"
+        | "HANSE"
+        | "LAGOON"
+        | "OTHER"
+        | "DUMMY_PRODUCER"
       boat_admin_status_enum:
         | "active"
         | "expired"
@@ -2062,6 +2118,7 @@ export type Database = {
         | "approved"
         | "paid"
         | "rejected"
+      owner_details_enum: "single_person" | "multiple_persons" | "company"
       payment_status_enum:
         | "not invoiced"
         | "pending"
@@ -2219,7 +2276,39 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      additional_service_enum: ["mmsi", "express_registration"],
       app_role: ["manager", "admin", "user", "viewer"],
+      b2b_homeport_enum: [
+        "Gdynia",
+        "Gdańsk",
+        "Szczecin",
+        "Kołobrzeg",
+        "Świnoujście",
+        "DUMMY_HOMEPORT",
+      ],
+      b2b_hull_material_enum: [
+        "GRP",
+        "Aluminum",
+        "Steel",
+        "Wood",
+        "Other",
+        "DUMMY_MATERIAL",
+      ],
+      b2b_main_drive_enum: [
+        "sail_drive",
+        "motor_drive",
+        "skijet",
+        "dummy_drive",
+      ],
+      b2b_producer_enum: [
+        "BENETEAU",
+        "BAVARIA",
+        "JEANNEAU",
+        "HANSE",
+        "LAGOON",
+        "OTHER",
+        "DUMMY_PRODUCER",
+      ],
       boat_admin_status_enum: [
         "active",
         "expired",
@@ -2259,6 +2348,7 @@ export const Constants = {
         "paid",
         "rejected",
       ],
+      owner_details_enum: ["single_person", "multiple_persons", "company"],
       payment_status_enum: [
         "not invoiced",
         "pending",
