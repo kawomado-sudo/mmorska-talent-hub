@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_order_pdf_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: number
+          payload: Json
+          status: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          submission_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: number
+          payload?: Json
+          status?: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          submission_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: number
+          payload?: Json
+          status?: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          submission_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_user_profiles: {
         Row: {
           agent_email: string
@@ -104,6 +134,11 @@ export type Database = {
           payment_status:
             | Database["public"]["Enums"]["payment_status_enum"]
             | null
+          pdf_error: string | null
+          pdf_generated_at: string | null
+          pdf_requested_at: string | null
+          pdf_status: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          pdf_storage_path: string | null
           random_id: string | null
           reg_nr: string | null
           registration_date: string | null
@@ -114,6 +149,7 @@ export type Database = {
           shipper: string | null
           shipping_status: string | null
           shipyard: string | null
+          signature_storage_path: string | null
           street: string | null
           submission_id: string
           telefon: string | null
@@ -178,6 +214,11 @@ export type Database = {
           payment_status?:
             | Database["public"]["Enums"]["payment_status_enum"]
             | null
+          pdf_error?: string | null
+          pdf_generated_at?: string | null
+          pdf_requested_at?: string | null
+          pdf_status?: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          pdf_storage_path?: string | null
           random_id?: string | null
           reg_nr?: string | null
           registration_date?: string | null
@@ -188,6 +229,7 @@ export type Database = {
           shipper?: string | null
           shipping_status?: string | null
           shipyard?: string | null
+          signature_storage_path?: string | null
           street?: string | null
           submission_id: string
           telefon?: string | null
@@ -252,6 +294,11 @@ export type Database = {
           payment_status?:
             | Database["public"]["Enums"]["payment_status_enum"]
             | null
+          pdf_error?: string | null
+          pdf_generated_at?: string | null
+          pdf_requested_at?: string | null
+          pdf_status?: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          pdf_storage_path?: string | null
           random_id?: string | null
           reg_nr?: string | null
           registration_date?: string | null
@@ -262,6 +309,7 @@ export type Database = {
           shipper?: string | null
           shipping_status?: string | null
           shipyard?: string | null
+          signature_storage_path?: string | null
           street?: string | null
           submission_id?: string
           telefon?: string | null
@@ -2073,6 +2121,30 @@ export type Database = {
       current_user_is_team_member: { Args: never; Returns: boolean }
       edge_agent_email_exists: { Args: { p_email: string }; Returns: boolean }
       edge_agents_count: { Args: never; Returns: number }
+      edge_claim_agent_order_pdf_job: {
+        Args: { p_submission_id: string }
+        Returns: {
+          attempts: number
+          payload: Json
+          submission_id: string
+        }[]
+      }
+      edge_claim_next_agent_order_pdf_job: {
+        Args: never
+        Returns: {
+          attempts: number
+          payload: Json
+          submission_id: string
+        }[]
+      }
+      edge_enqueue_agent_order_pdf: {
+        Args: {
+          p_agent_email: string
+          p_payload?: Json
+          p_submission_id: string
+        }
+        Returns: undefined
+      }
       edge_get_agent_by_email: {
         Args: { p_email: string }
         Returns: {
@@ -2083,6 +2155,50 @@ export type Database = {
           commission_based: string
           id: number
         }[]
+      }
+      edge_get_agent_order_for_pdf: {
+        Args: { p_submission_id: string }
+        Returns: {
+          agent_email: string
+          boat_name: string
+          created_at: string
+          currency: string
+          customer_company: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          draft: string
+          drive: string[]
+          homeport: string
+          length: string
+          material: string
+          notes: string
+          service_type: string
+          shipyard: string
+          signature_storage_path: string
+          submission_id: string
+          total_amount: number
+          width: string
+        }[]
+      }
+      edge_get_agent_order_pdf_for_download: {
+        Args: { p_agent_email: string; p_submission_id: string }
+        Returns: {
+          pdf_generated_at: string
+          pdf_status: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          pdf_storage_path: string
+          submission_id: string
+        }[]
+      }
+      edge_update_agent_order_pdf_result: {
+        Args: {
+          p_payload?: Json
+          p_pdf_error?: string
+          p_pdf_storage_path?: string
+          p_status: Database["public"]["Enums"]["agent_order_pdf_status_enum"]
+          p_submission_id: string
+        }
+        Returns: undefined
       }
       edge_update_agent_profile: {
         Args: {
@@ -2141,6 +2257,12 @@ export type Database = {
     }
     Enums: {
       additional_service_enum: "mmsi" | "express_registration"
+      agent_order_pdf_status_enum:
+        | "not_requested"
+        | "queued"
+        | "generating"
+        | "generated"
+        | "failed"
       app_role: "manager" | "admin" | "user" | "viewer"
       b2b_homeport_enum:
         | "Gdynia"
@@ -2363,6 +2485,13 @@ export const Constants = {
   public: {
     Enums: {
       additional_service_enum: ["mmsi", "express_registration"],
+      agent_order_pdf_status_enum: [
+        "not_requested",
+        "queued",
+        "generating",
+        "generated",
+        "failed",
+      ],
       app_role: ["manager", "admin", "user", "viewer"],
       b2b_homeport_enum: [
         "Gdynia",
