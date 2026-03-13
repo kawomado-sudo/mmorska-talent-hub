@@ -1,70 +1,19 @@
-## MMorska — Wewnętrzny Panel Rekrutera
 
-### Przegląd
 
-Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
+## Diagnoza
 
-### Konfiguracja
+1. **Edge function była przestarzała** — wdrożona wersja nadal używała `gemini-2.0-flash` i miała bug ze stack overflow. Właśnie ją ponownie wdrożyłem (`deploy_edge_functions`) — to rozwiązuje główny problem z parsowaniem CV.
 
-1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
-2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
-3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
-4. **Font Inter** — import z Google Fonts
+2. **URL do CV nie działa** — bucket `hr-cv` jest **prywatny**, ale `parse-cv` zapisuje `getPublicUrl()` do `cv_url`. Publiczny URL nie zadziała dla prywatnego bucketa → link "Pobierz CV" w drawerze kandydata jest martwy.
 
-### Autoryzacja
+## Plan naprawy
 
-- `AuthProvider` context z `onAuthStateChange` + `getSession`
-- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
-- `ProtectedRoute` component — brak sesji → redirect `/login`
-- Przycisk wylogowania w sidebarze
+### 1. Edge function `parse-cv` — zmiana cv_url
+Zamiast `getPublicUrl()`, zapisywać `cv_storage_path` (ścieżkę w storage) do kolumny `cv_url`. Drawer będzie generował signed URL na żądanie.
 
-### Strona `/login`
+### 2. `CandidateDrawer.tsx` — signed URL on demand
+Przy otwarciu drawera, jeśli `cv_url` zawiera ścieżkę (nie pełny URL), wygenerować signed URL przez `supabase.storage.from('hr-cv').createSignedUrl(path, 3600)` i użyć go do przycisku "Pobierz CV".
 
-- Wyśrodkowane logo MMorska na ciemnym tle
-- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
-- Brak pól email/hasło
+### 3. Weryfikacja
+Edge function `parse-cv` jest już wdrożona z poprawnym modelem Gemini 2.5 Flash i chunked base64.
 
-### Layout z Sidebarem
-
-- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
-- Przycisk "Wyloguj" na dole
-- Kompaktowy, profesjonalny design
-
-### Strona `/jobs` — Ogłoszenia
-
-- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
-- Przycisk "Nowe ogłoszenie" → modal z formularzem
-- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
-- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
-- Liczba kandydatur pobierana z `hr.applications` (count per job)
-
-### Strona `/jobs/:id/applications` — Kandydatury
-
-- Nagłówek z nazwą stanowiska + link powrotny
-- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
-- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
-- Kliknięcie wiersza → drawer boczny
-
-### Drawer kandydata
-
-- Dane kontaktowe: imię, nazwisko, email, telefon
-- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
-- List motywacyjny (przewijany)
-- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
-- Edytowalne pole "Notatki rekrutera" z zapisem inline
-- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
-- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
-- Historia statusów — chronologiczna lista zmian
-
-### Strona `/settings` — Ustawienia formularza
-
-- Formularz z polami z `hr.form_config` (klucz-wartość)
-- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
-- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
-
-### Ważne szczegóły techniczne
-
-- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
-- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
-- Brak jakiegokolwiek email/password auth w kodzie
-- Status change = UPDATE + INSERT log (atomowo)
