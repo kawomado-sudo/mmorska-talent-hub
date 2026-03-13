@@ -106,7 +106,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
             {application.phone && <div><span className="text-muted-foreground">Telefon:</span> {application.phone}</div>}
           </div>
 
-          {(application.cv_url || application.cv_link) && (
+          {cvSignedUrl && (
             <div>
               {application.cv_link ? (
                 <Button variant="outline" size="sm" asChild>
@@ -116,7 +116,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" asChild>
-                  <a href={application.cv_url} target="_blank" rel="noreferrer" className="gap-2">
+                  <a href={cvSignedUrl} target="_blank" rel="noreferrer" className="gap-2">
                     <Download className="h-4 w-4" /> Pobierz CV
                   </a>
                 </Button>
