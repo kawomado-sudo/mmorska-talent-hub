@@ -29,9 +29,22 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
+  const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (application) setNotes(application.recruiter_notes || '');
+    if (application) {
+      setNotes(application.recruiter_notes || '');
+      setCvSignedUrl(null);
+      // Generate signed URL if cv_url is a storage path (not a full URL)
+      const cvPath = application.cv_url;
+      if (cvPath && !cvPath.startsWith('http')) {
+        supabase.storage.from('hr-cv').createSignedUrl(cvPath, 3600).then(({ data }) => {
+          if (data?.signedUrl) setCvSignedUrl(data.signedUrl);
+        });
+      } else if (cvPath) {
+        setCvSignedUrl(cvPath);
+      }
+    }
   }, [application]);
 
   const { data: statusHistory } = useQuery({
