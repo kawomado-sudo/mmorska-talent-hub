@@ -146,12 +146,7 @@ ai_rating powinien uwzględniać: dopasowanie umiejętności, doświadczenie, wy
       });
     }
 
-    // 5. Get public URL for CV
-    const { data: publicUrlData } = supabaseStorage.storage
-      .from("hr-cv")
-      .getPublicUrl(cv_storage_path);
-
-    // 6. Insert application record
+    // 5. Insert application record (store storage path, not public URL)
     const { data: appData, error: appError } = await supabase
       .from("applications")
       .insert({
@@ -162,7 +157,7 @@ ai_rating powinien uwzględniać: dopasowanie umiejętności, doświadczenie, wy
         phone: parsed.phone || null,
         ai_summary: parsed.ai_summary || null,
         ai_rating: Math.min(100, Math.max(0, parseInt(parsed.ai_rating) || 0)),
-        cv_url: publicUrlData?.publicUrl || null,
+        cv_url: cv_storage_path,
         status: "new",
       })
       .select()

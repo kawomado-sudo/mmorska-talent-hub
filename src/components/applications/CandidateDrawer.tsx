@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hrApi } from '@/lib/hr-api';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,9 +29,22 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
+  const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (application) setNotes(application.recruiter_notes || '');
+    if (application) {
+      setNotes(application.recruiter_notes || '');
+      setCvSignedUrl(null);
+      // Generate signed URL if cv_url is a storage path (not a full URL)
+      const cvPath = application.cv_url;
+      if (cvPath && !cvPath.startsWith('http')) {
+        supabase.storage.from('hr-cv').createSignedUrl(cvPath, 3600).then(({ data }) => {
+          if (data?.signedUrl) setCvSignedUrl(data.signedUrl);
+        });
+      } else if (cvPath) {
+        setCvSignedUrl(cvPath);
+      }
+    }
   }, [application]);
 
   const { data: statusHistory } = useQuery({
@@ -92,7 +106,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
             {application.phone && <div><span className="text-muted-foreground">Telefon:</span> {application.phone}</div>}
           </div>
 
-          {(application.cv_url || application.cv_link) && (
+          {cvSignedUrl && (
             <div>
               {application.cv_link ? (
                 <Button variant="outline" size="sm" asChild>
@@ -102,7 +116,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" asChild>
-                  <a href={application.cv_url} target="_blank" rel="noreferrer" className="gap-2">
+                  <a href={cvSignedUrl} target="_blank" rel="noreferrer" className="gap-2">
                     <Download className="h-4 w-4" /> Pobierz CV
                   </a>
                 </Button>
