@@ -86,7 +86,7 @@ Wygeneruj 5-8 obowiązków i 5-8 wymagań. Bądź konkretny i dostosuj treść d
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 4096,
         },
       }),
     });
