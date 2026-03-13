@@ -71,7 +71,7 @@ Zwróć DOKŁADNIE taki JSON (bez markdown, sam obiekt JSON):
 
 Wygeneruj 5-8 obowiązków i 5-8 wymagań. Bądź konkretny i dostosuj treść do branży jachtowej/konstrukcji stalowych. Uwzględnij miękkie kompetencje jak umiejętność pracy w małym zespole, komunikatywność, pozytywne nastawienie.`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: "POST",
