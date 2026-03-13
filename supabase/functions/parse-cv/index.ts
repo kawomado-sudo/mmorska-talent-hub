@@ -78,7 +78,7 @@ serve(async (req) => {
       .join("\n");
 
     // 4. Call Gemini API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: "POST",
