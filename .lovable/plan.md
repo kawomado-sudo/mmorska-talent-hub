@@ -1,70 +1,43 @@
-## MMorska — Wewnętrzny Panel Rekrutera
 
-### Przegląd
 
-Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
+## Odpowiedzi na pytania
 
-### Konfiguracja
+1. **Klucz Gemini API** — Tak, secret `GOOGLE_GEMINI_API_KEY` jest ustawiony w Supabase i używany bezpośrednio w edge function `parse-cv` (linia 26: `Deno.env.get("GOOGLE_GEMINI_API_KEY")`). Wywołuje Google Gemini 2.0 Flash bezpośrednio przez `generativelanguage.googleapis.com`. To jest Wasz klucz, nie z Lovable AI Gateway.
 
-1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
-2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
-3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
-4. **Font Inter** — import z Google Fonts
+2. **Propozycja** — Projekt ma też dostęp do `LOVABLE_API_KEY` (Lovable AI Gateway), który daje dostęp do nowszych modeli (Gemini 2.5 Flash/Pro, GPT-5). Można na niego przejść, ale nie jest to konieczne — obecne podejście z własnym kluczem Gemini działa.
 
-### Autoryzacja
+## Plan: AI-asystent w formularzu ogłoszenia
 
-- `AuthProvider` context z `onAuthStateChange` + `getSession`
-- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
-- `ProtectedRoute` component — brak sesji → redirect `/login`
-- Przycisk wylogowania w sidebarze
+Dodanie przycisku "Dopracuj z AI" w `JobFormDialog`, który na podstawie tytułu i szkicowych notatek generuje profesjonalny opis stanowiska, obowiązki i wymagania — dopasowane do MMorskiej (branża jachtowa, konstrukcje stalowe, mały zespół, przyjazna atmosfera).
 
-### Strona `/login`
+### 1. Nowa edge function `generate-job-description`
 
-- Wyśrodkowane logo MMorska na ciemnym tle
-- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
-- Brak pól email/hasło
+Używa istniejącego `GOOGLE_GEMINI_API_KEY` (spójność z `parse-cv`).
 
-### Layout z Sidebarem
+**Wejście:** `{ title, department?, draft_description?, draft_responsibilities?, draft_requirements? }`
 
-- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
-- Przycisk "Wyloguj" na dole
-- Kompaktowy, profesjonalny design
+**Prompt systemowy** (hardcoded w edge function):
+> Jesteś asystentem HR firmy MMorska — firmy z branży jachtowej i konstrukcji stalowych. Firma ceni sobie przyjazne podejście do ludzi i życia, pracę w małym, zgranym zespole. Na podstawie podanego stanowiska i notatek wygeneruj profesjonalne ogłoszenie rekrutacyjne po polsku. Zwróć JSON z polami: description, responsibilities (tablica), requirements (tablica).
 
-### Strona `/jobs` — Ogłoszenia
+**Wyjście:** JSON z `description`, `responsibilities[]`, `requirements[]`
 
-- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
-- Przycisk "Nowe ogłoszenie" → modal z formularzem
-- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
-- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
-- Liczba kandydatur pobierana z `hr.applications` (count per job)
+### 2. Zmiany w `JobFormDialog.tsx`
 
-### Strona `/jobs/:id/applications` — Kandydatury
+- Nowy przycisk "✨ Dopracuj z AI" pod polem Tytuł (lub na dole sekcji)
+- Po kliknięciu: wysyła obecne wartości formularza do edge function
+- Wynik AI wypełnia pola `description`, `responsibilities`, `requirements`
+- Użytkownik może edytować wynik przed zapisem
+- Stan ładowania z komunikatem "AI generuje opis..."
+- Przycisk aktywny tylko gdy tytuł jest wypełniony
 
-- Nagłówek z nazwą stanowiska + link powrotny
-- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
-- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
-- Kliknięcie wiersza → drawer boczny
+### 3. Szczegóły techniczne
 
-### Drawer kandydata
+- Edge function: `supabase/functions/generate-job-description/index.ts`
+- Weryfikacja JWT jak w `hr-api`
+- Wywołanie przez istniejący helper `hrApi` — albo bezpośredni fetch do nowej funkcji
+- Odpowiedź AI konwertowana: `responsibilities` i `requirements` jako tablica → join z `\n` do textarea
 
-- Dane kontaktowe: imię, nazwisko, email, telefon
-- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
-- List motywacyjny (przewijany)
-- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
-- Edytowalne pole "Notatki rekrutera" z zapisem inline
-- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
-- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
-- Historia statusów — chronologiczna lista zmian
+### 4. Config
 
-### Strona `/settings` — Ustawienia formularza
+- Dodanie `generate-job-description` do `supabase/config.toml`
 
-- Formularz z polami z `hr.form_config` (klucz-wartość)
-- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
-- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
-
-### Ważne szczegóły techniczne
-
-- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
-- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
-- Brak jakiegokolwiek email/password auth w kodzie
-- Status change = UPDATE + INSERT log (atomowo)
