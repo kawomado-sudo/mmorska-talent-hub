@@ -732,66 +732,6 @@ export type Database = {
         }
         Relationships: []
       }
-      boats_data: {
-        Row: {
-          admin_status:
-            | Database["public"]["Enums"]["boat_admin_status_enum"]
-            | null
-          bandera: string | null
-          boat_hin: string | null
-          boat_homeport: string | null
-          boat_name: string
-          boat_reg_number: string | null
-          boat_type: string | null
-          created_at: string | null
-          flag_expiry_date: string | null
-          id: string
-          last_service_date: string | null
-          next_service_due: string | null
-          registration_date: string | null
-          updated_at: string | null
-          usage_type: string[] | null
-        }
-        Insert: {
-          admin_status?:
-            | Database["public"]["Enums"]["boat_admin_status_enum"]
-            | null
-          bandera?: string | null
-          boat_hin?: string | null
-          boat_homeport?: string | null
-          boat_name: string
-          boat_reg_number?: string | null
-          boat_type?: string | null
-          created_at?: string | null
-          flag_expiry_date?: string | null
-          id?: string
-          last_service_date?: string | null
-          next_service_due?: string | null
-          registration_date?: string | null
-          updated_at?: string | null
-          usage_type?: string[] | null
-        }
-        Update: {
-          admin_status?:
-            | Database["public"]["Enums"]["boat_admin_status_enum"]
-            | null
-          bandera?: string | null
-          boat_hin?: string | null
-          boat_homeport?: string | null
-          boat_name?: string
-          boat_reg_number?: string | null
-          boat_type?: string | null
-          created_at?: string | null
-          flag_expiry_date?: string | null
-          id?: string
-          last_service_date?: string | null
-          next_service_due?: string | null
-          registration_date?: string | null
-          updated_at?: string | null
-          usage_type?: string[] | null
-        }
-        Relationships: []
-      }
       call_events: {
         Row: {
           "ai voice agent": string | null
