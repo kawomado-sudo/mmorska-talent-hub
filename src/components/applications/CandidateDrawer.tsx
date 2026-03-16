@@ -4,12 +4,13 @@ import { hrApi } from '@/lib/hr-api';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sparkles, Download, ExternalLink, Save } from 'lucide-react';
+import { Sparkles, Download, ExternalLink, Save, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CandidateDrawerProps {
