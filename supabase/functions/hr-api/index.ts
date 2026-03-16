@@ -44,11 +44,19 @@ Deno.serve(async (req) => {
     { db: { schema: "hr" } }
   );
 
+  // Public schema client (for team_members_public)
+  const dbPublic = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { db: { schema: "public" } }
+  );
+
   const body = await req.json();
   const { action, ...params } = body;
 
   try {
     switch (action) {
+      // ─── JOBS ───────────────────────────────────────────
       case "list_jobs": {
         const { data: jobs, error } = await db
           .from("jobs")
@@ -101,6 +109,7 @@ Deno.serve(async (req) => {
         return json({ ok: true });
       }
 
+      // ─── APPLICATIONS ──────────────────────────────────
       case "list_applications": {
         let query = db
           .from("applications")
@@ -109,6 +118,10 @@ Deno.serve(async (req) => {
           .order("created_at", { ascending: false });
         if (params.status && params.status !== "all") {
           query = query.eq("status", params.status);
+        }
+        // If reviewer_only flag is set, filter by assigned_reviewer_id
+        if (params.reviewer_only) {
+          query = query.eq("assigned_reviewer_id", userId);
         }
         const { data, error } = await query;
         if (error) throw error;
@@ -132,6 +145,7 @@ Deno.serve(async (req) => {
         return json({ ok: true });
       }
 
+      // ─── STATUS LOG ─────────────────────────────────────
       case "list_status_log": {
         const { data, error } = await db
           .from("application_status_log")
@@ -151,6 +165,99 @@ Deno.serve(async (req) => {
         });
         if (error) throw error;
         return json({ ok: true });
+      }
+
+      // ─── REVIEWERS ──────────────────────────────────────
+      case "list_reviewers": {
+        const { data, error } = await db
+          .from("hr_reviewers")
+          .select("*")
+          .eq("active", true)
+          .order("full_name");
+        if (error) throw error;
+        return json(data);
+      }
+
+      case "add_reviewer": {
+        // params: auth_user_id, full_name, email
+        const { error } = await db.from("hr_reviewers").insert({
+          auth_user_id: params.auth_user_id,
+          full_name: params.full_name,
+          email: params.email,
+        });
+        if (error) throw error;
+        return json({ ok: true });
+      }
+
+      case "remove_reviewer": {
+        // Soft-delete: set active = false
+        const { error } = await db
+          .from("hr_reviewers")
+          .update({ active: false })
+          .eq("id", params.id);
+        if (error) throw error;
+        return json({ ok: true });
+      }
+
+      case "assign_reviewer": {
+        // params: application_id, reviewer_id (auth_user_id of reviewer)
+        const { application_id, reviewer_id } = params;
+
+        // Get current status
+        const { data: app, error: appErr } = await db
+          .from("applications")
+          .select("status")
+          .eq("id", application_id)
+          .single();
+        if (appErr) throw appErr;
+
+        const oldStatus = app.status;
+
+        // Update application: set status to reviewing + assign reviewer
+        const { error: updErr } = await db
+          .from("applications")
+          .update({
+            status: "reviewing",
+            assigned_reviewer_id: reviewer_id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", application_id);
+        if (updErr) throw updErr;
+
+        // Insert status log
+        const { error: logErr } = await db
+          .from("application_status_log")
+          .insert({
+            application_id,
+            old_status: oldStatus,
+            new_status: "reviewing",
+            changed_by: userId,
+          });
+        if (logErr) throw logErr;
+
+        return json({ ok: true });
+      }
+
+      case "check_is_reviewer": {
+        const { data, error } = await db
+          .from("hr_reviewers")
+          .select("id")
+          .eq("auth_user_id", userId)
+          .eq("active", true)
+          .maybeSingle();
+        if (error) throw error;
+        return json({ is_reviewer: !!data });
+      }
+
+      case "list_team_members": {
+        // Return team members from public schema for reviewer selection
+        const { data, error } = await dbPublic
+          .from("team_members_public")
+          .select("id, auth_user_id, full_name, email, active")
+          .eq("active", true)
+          .order("full_name");
+        if (error) throw error;
+        return json(data);
       }
 
       default:

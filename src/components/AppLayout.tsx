@@ -4,13 +4,13 @@ import { Briefcase, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import morskaLogo from '@/assets/mmorska-logo.png';
 
-const navItems = [
-  { to: '/jobs', label: 'Ogłoszenia', icon: Briefcase },
-  { to: '/settings', label: 'Ustawienia', icon: Settings },
-];
-
 export const AppLayout = () => {
-  const { signOut } = useAuth();
+  const { signOut, isReviewer, isAdmin } = useAuth();
+
+  const navItems = [
+    { to: '/jobs', label: 'Ogłoszenia', icon: Briefcase, visible: true },
+    { to: '/settings', label: 'Ustawienia', icon: Settings, visible: isAdmin },
+  ].filter((item) => item.visible);
 
   return (
     <div className="flex min-h-screen">
