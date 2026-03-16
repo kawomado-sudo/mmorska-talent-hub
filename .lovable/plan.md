@@ -1,70 +1,33 @@
-## MMorska — Wewnętrzny Panel Rekrutera
 
-### Przegląd
 
-Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
+## Problem
 
-### Konfiguracja
+Komponent przypisywania recenzenta istnieje w `CandidateDrawer.tsx`, ale ma dwa problemy:
 
-1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
-2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
-3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
-4. **Font Inter** — import z Google Fonts
+1. **Ukryty flow** — panel przypisywania pojawia się dopiero po kliknięciu przycisku "W ocenie", co jest nieintuicyjne. Użytkownik nie wie, że ma tam kliknąć.
 
-### Autoryzacja
+2. **Brak danych `auth_user_id`** — większość pracowników w `team_members_public` nie ma ustawionego `auth_user_id` (jest `null`). Komponent `SelectItem` używa `m.auth_user_id` jako wartości, co powoduje że te osoby albo się nie wyświetlają, albo łamią Select.
 
-- `AuthProvider` context z `onAuthStateChange` + `getSession`
-- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
-- `ProtectedRoute` component — brak sesji → redirect `/login`
-- Przycisk wylogowania w sidebarze
+## Zmiany
 
-### Strona `/login`
+### 1. `CandidateDrawer.tsx` — osobna sekcja "Przypisz recenzenta"
 
-- Wyśrodkowane logo MMorska na ciemnym tle
-- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
-- Brak pól email/hasło
+- Wydzielić przypisywanie recenzenta jako **stałą, widoczną sekcję** w drawerze (nie ukrytą za kliknięciem "W ocenie")
+- Sekcja widoczna dla managerów/adminów (`!isReviewer`), z selektem pracownika i przyciskiem "Przypisz"
+- Filtrować `teamMembers` tak, żeby pokazywać **tylko tych z `auth_user_id` != null** (bez konta w systemie nie mogą się zalogować jako recenzent)
+- Używać `m.auth_user_id` jako value w Select (bezpieczne po filtrze)
+- Wyświetlić aktualnie przypisanego recenzenta jeśli istnieje (`application.assigned_reviewer_id`)
+- Usunąć ukryty flow z `showReviewerSelect` / handleStatusClick
 
-### Layout z Sidebarem
+### 2. Bez zmian w backend
 
-- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
-- Przycisk "Wyloguj" na dole
-- Kompaktowy, profesjonalny design
+Edge function `assign_reviewer` działa poprawnie — przyjmuje `reviewer_id` (auth_user_id) i przypisuje recenzenta + wysyła email. Nie wymaga zmian.
 
-### Strona `/jobs` — Ogłoszenia
+### Podsumowanie UI
 
-- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
-- Przycisk "Nowe ogłoszenie" → modal z formularzem
-- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
-- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
-- Liczba kandydatur pobierana z `hr.applications` (count per job)
+Nowa sekcja pojawi się pomiędzy "Notatki rekrutera" a "Zmień status":
+- Nagłówek "Przypisz recenzenta" z ikoną UserCheck
+- Select z listą aktywnych pracowników (filtr: `auth_user_id != null`)
+- Przycisk "Przypisz" (zmienia status na "reviewing" automatycznie)
+- Info o aktualnie przypisanym recenzencie jeśli jest
 
-### Strona `/jobs/:id/applications` — Kandydatury
-
-- Nagłówek z nazwą stanowiska + link powrotny
-- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
-- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
-- Kliknięcie wiersza → drawer boczny
-
-### Drawer kandydata
-
-- Dane kontaktowe: imię, nazwisko, email, telefon
-- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
-- List motywacyjny (przewijany)
-- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
-- Edytowalne pole "Notatki rekrutera" z zapisem inline
-- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
-- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
-- Historia statusów — chronologiczna lista zmian
-
-### Strona `/settings` — Ustawienia formularza
-
-- Formularz z polami z `hr.form_config` (klucz-wartość)
-- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
-- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
-
-### Ważne szczegóły techniczne
-
-- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
-- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
-- Brak jakiegokolwiek email/password auth w kodzie
-- Status change = UPDATE + INSERT log (atomowo)
