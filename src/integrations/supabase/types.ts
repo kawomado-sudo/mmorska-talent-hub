@@ -2059,6 +2059,10 @@ export type Database = {
       cost_is_admin_or_manager: { Args: never; Returns: boolean }
       cost_is_admin_or_manager_with_access: { Args: never; Returns: boolean }
       current_user_is_team_member: { Args: never; Returns: boolean }
+      delete_agent_draft: {
+        Args: { p_submission_id: string }
+        Returns: undefined
+      }
       edge_agent_email_exists: { Args: { p_email: string }; Returns: boolean }
       edge_agents_count: { Args: never; Returns: number }
       edge_claim_agent_order_pdf_job: {
@@ -2149,6 +2153,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_agent_drafts: {
+        Args: never
+        Returns: {
+          boat_name: string
+          created_at: string
+          customer_name: string
+          draft: string
+          submission_id: string
+        }[]
+      }
       get_agents_directory: {
         Args: never
         Returns: {
@@ -2194,6 +2208,10 @@ export type Database = {
       migrate_agents_orders_direct_data: { Args: never; Returns: undefined }
       parse_any_date: { Args: { date_text: string }; Returns: string }
       parse_polish_date: { Args: { date_text: string }; Returns: string }
+      update_agent_draft: {
+        Args: { p_draft: string; p_submission_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       additional_service_enum: "mmsi" | "express_registration"
