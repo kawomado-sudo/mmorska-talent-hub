@@ -264,21 +264,21 @@ Deno.serve(async (req) => {
           .eq("id", app.job_id)
           .single();
 
-        // Send email notification to reviewer via Resend
-        const resendKey = Deno.env.get("RESEND_API_KEY");
-        if (resendKey && member.email) {
+        // Send email notification to reviewer via Maileroo
+        const mailerooKey = Deno.env.get("MAILEROO_API_KEY");
+        if (mailerooKey && member.email) {
           try {
             const candidateName = `${app.first_name || ''} ${app.last_name || ''}`.trim();
             const jobTitle = job?.title || 'Nieznane stanowisko';
-            await fetch("https://api.resend.com/emails", {
+            await fetch("https://smtp.maileroo.com/api/v2/emails", {
               method: "POST",
               headers: {
-                "Authorization": `Bearer ${resendKey}`,
+                "X-API-Key": mailerooKey,
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                from: "MMorska HR <onboarding@resend.dev>",
-                to: [member.email],
+                from: { address: "hr@mmorska.pl", display_name: "MMorska HR" },
+                to: [{ address: member.email, display_name: member.full_name || "" }],
                 subject: `Nowe zadanie: ocena kandydata — ${candidateName}`,
                 html: `
                   <h2>Zostałeś przypisany jako recenzent</h2>
