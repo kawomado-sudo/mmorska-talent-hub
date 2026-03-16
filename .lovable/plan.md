@@ -1,41 +1,70 @@
+## MMorska — Wewnętrzny Panel Rekrutera
 
+### Przegląd
 
-## Plan: Przypisywanie recenzentów z bazy pracowników + powiadomienie email
+Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
 
-### Co się zmienia
+### Konfiguracja
 
-Obecnie rekruter przypisuje recenzenta z puli `hr_reviewers` (zarządzanej w Ustawieniach). Chcesz móc wybrać dowolnego pracownika z bazy (`team_members_public`) bezpośrednio przy przypisywaniu kandydata — i automatycznie dodać go do puli recenzentów jeśli jeszcze go tam nie ma. Dodatkowo recenzent dostaje email z powiadomieniem o przypisaniu.
+1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
+2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
+3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
+4. **Font Inter** — import z Google Fonts
 
-### Zmiany
+### Autoryzacja
 
-#### 1. `CandidateDrawer.tsx` — select z team_members zamiast hr_reviewers
-- Zmiana query w reviewer select: zamiast `list_reviewers` używamy `list_team_members` (zwraca wszystkich aktywnych pracowników)
-- Dzięki temu manager może wybrać dowolnego pracownika, nie tylko tych dodanych do puli
+- `AuthProvider` context z `onAuthStateChange` + `getSession`
+- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
+- `ProtectedRoute` component — brak sesji → redirect `/login`
+- Przycisk wylogowania w sidebarze
 
-#### 2. `hr-api/index.ts` — rozszerzenie `assign_reviewer`
-- Po przypisaniu recenzenta sprawdza czy pracownik jest już w `hr_reviewers` — jeśli nie, automatycznie go dodaje (upsert)
-- Po pomyślnym przypisaniu wysyła email z powiadomieniem do recenzenta
+### Strona `/login`
 
-#### 3. Nowa edge function `supabase/functions/send-reviewer-notification/index.ts`
-- Prosta funkcja wysyłająca email do recenzenta za pomocą Lovable Email API (LOVABLE_API_KEY jest już dostępny)
-- Treść: imię i nazwisko kandydata, link do aplikacji, nazwa ogłoszenia
-- Wywoływana z `assign_reviewer` w `hr-api`
+- Wyśrodkowane logo MMorska na ciemnym tle
+- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
+- Brak pól email/hasło
 
-Alternatywnie — email można wysłać bezpośrednio z `hr-api` bez osobnej funkcji, korzystając z Resend API lub innego providera.
+### Layout z Sidebarem
 
-#### 4. Wymagana konfiguracja email
-Projekt nie ma jeszcze skonfigurowanej infrastruktury email (brak domeny, brak Resend API key). Mamy dwie opcje:
+- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
+- Przycisk "Wyloguj" na dole
+- Kompaktowy, profesjonalny design
 
-**Opcja A — Resend API** (najprostsza): Dodajemy secret `RESEND_API_KEY`, wysyłamy email bezpośrednio z `hr-api` przez Resend REST API. Emails wysyłane z domeny Resend (np. `onboarding@resend.dev` na początek).
+### Strona `/jobs` — Ogłoszenia
 
-**Opcja B — Lovable Email Infrastructure**: Konfigurujemy domenę email przez Cloud → Emails, co daje pełną infrastrukturę z kolejką, retries i branding.
+- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
+- Przycisk "Nowe ogłoszenie" → modal z formularzem
+- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
+- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
+- Liczba kandydatur pobierana z `hr.applications` (count per job)
 
-### Rekomendacja
-Opcja A (Resend) jest najszybsza — wymaga tylko API key. Mogę poprosić o dodanie sekretu `RESEND_API_KEY` i zaimplementować wysyłkę w jednym kroku.
+### Strona `/jobs/:id/applications` — Kandydatury
 
-### Podsumowanie zmian plików
-- **`CandidateDrawer.tsx`**: select z `list_team_members` zamiast `list_reviewers`
-- **`hr-api/index.ts`**: `assign_reviewer` auto-dodaje do `hr_reviewers` + wywołuje wysyłkę email
-- **Secret**: `RESEND_API_KEY` (do dodania)
-- Opcjonalnie: osobna edge function do emaili lub inline w hr-api
+- Nagłówek z nazwą stanowiska + link powrotny
+- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
+- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
+- Kliknięcie wiersza → drawer boczny
 
+### Drawer kandydata
+
+- Dane kontaktowe: imię, nazwisko, email, telefon
+- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
+- List motywacyjny (przewijany)
+- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
+- Edytowalne pole "Notatki rekrutera" z zapisem inline
+- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
+- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
+- Historia statusów — chronologiczna lista zmian
+
+### Strona `/settings` — Ustawienia formularza
+
+- Formularz z polami z `hr.form_config` (klucz-wartość)
+- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
+- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
+
+### Ważne szczegóły techniczne
+
+- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
+- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
+- Brak jakiegokolwiek email/password auth w kodzie
+- Status change = UPDATE + INSERT log (atomowo)
