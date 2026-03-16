@@ -116,16 +116,11 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     },
   });
 
-  if (!application) return null;
-
   const handleStatusClick = (statusValue: string) => {
-    if (statusValue === 'reviewing' && !isReviewer) {
-      // Show reviewer select instead of immediately changing status
-      setShowReviewerSelect(true);
-      return;
-    }
     statusMutation.mutate(statusValue);
   };
+
+  const filteredTeamMembers = (teamMembers || []).filter((m: any) => m.auth_user_id != null);
 
   // Reviewer sees only Accept/Reject buttons
   const visibleActions = isReviewer
