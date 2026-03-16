@@ -1,49 +1,96 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* MMorska Design System — shared across all apps */
+/* Source of truth: cost-flow-buddy/src/index.css   */
+/* Version: 2026-03                                  */
+
 @layer base {
   :root {
-    --background: 24 20% 5%;
-    --foreground: 40 10% 90%;
+    /* Teal primary #0f7173 */
+    --primary: 181 78% 25%;
+    --primary-foreground: 0 0% 98%;
 
-    --card: 24 22% 10%;
-    --card-foreground: 40 10% 90%;
+    --background: 30 14% 95%;
+    --foreground: 220 52% 16%;
 
-    --popover: 24 22% 10%;
-    --popover-foreground: 40 10% 90%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 52% 16%;
 
-    --primary: 199 89% 48%;
-    --primary-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 52% 16%;
 
-    --secondary: 24 15% 15%;
-    --secondary-foreground: 40 10% 90%;
+    --secondary: 181 20% 90%;
+    --secondary-foreground: 220 52% 16%;
 
-    --muted: 24 15% 15%;
-    --muted-foreground: 30 8% 55%;
+    --muted: 30 10% 92%;
+    --muted-foreground: 220 10% 46%;
 
-    --accent: 24 15% 15%;
-    --accent-foreground: 40 10% 90%;
+    /* Gold accent #fabb5b */
+    --accent: 37 94% 67%;
+    --accent-foreground: 220 52% 16%;
 
-    --destructive: 0 62.8% 50%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 28 14% 16%;
-    --input: 28 14% 16%;
-    --ring: 199 89% 48%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 181 78% 25%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 24 25% 8%;
-    --sidebar-foreground: 30 8% 70%;
-    --sidebar-primary: 199 89% 48%;
+    /* Sidebar — Navy #14213d */
+    --sidebar-background: 220 52% 16%;
+    --sidebar-foreground: 30 14% 95%;
+    --sidebar-primary: 181 78% 25%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    /* Gold active link */
+    --sidebar-accent: 37 94% 67%;
+    --sidebar-accent-foreground: 220 52% 16%;
+    --sidebar-border: 220 40% 22%;
+    --sidebar-ring: 181 78% 25%;
+  }
+
+  .dark {
+    --background: 220 52% 8%;
+    --foreground: 30 14% 95%;
+
+    --card: 220 45% 12%;
+    --card-foreground: 30 14% 95%;
+
+    --popover: 220 45% 12%;
+    --popover-foreground: 30 14% 95%;
+
+    --primary: 181 78% 30%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 220 30% 18%;
+    --secondary-foreground: 30 14% 95%;
+
+    --muted: 220 30% 18%;
+    --muted-foreground: 220 15% 60%;
+
+    --accent: 37 94% 67%;
+    --accent-foreground: 220 52% 8%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 30% 20%;
+    --input: 220 30% 20%;
+    --ring: 181 78% 30%;
+
+    --sidebar-background: 220 55% 10%;
+    --sidebar-foreground: 30 14% 95%;
+    --sidebar-primary: 181 78% 35%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 24 15% 14%;
-    --sidebar-accent-foreground: 40 10% 90%;
-    --sidebar-border: 28 14% 14%;
-    --sidebar-ring: 199 89% 48%;
+    --sidebar-accent: 37 94% 67%;
+    --sidebar-accent-foreground: 220 52% 8%;
+    --sidebar-border: 220 40% 15%;
+    --sidebar-ring: 181 78% 35%;
   }
 }
 
@@ -53,7 +100,11 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif;
   }
 }

@@ -1,24 +1,70 @@
+## MMorska — Wewnętrzny Panel Rekrutera
 
+### Przegląd
 
-## Aktualizacja Design System — MMorska 2026-03
+Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
 
-Użytkownik przesłał dwa pliki definiujące nowy system wizualny MMorska. Zmiany obejmują przejście z ciemnego motywu na jasny (light) z opcją dark mode, nową paletę kolorów (teal primary, gold accent, navy sidebar) oraz dodanie fontu Montserrat dla nagłówków.
+### Konfiguracja
 
-### Zmiany
+1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
+2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
+3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
+4. **Font Inter** — import z Google Fonts
 
-#### 1. `src/index.css` — zastąpienie CSS variables
-- Nowa paleta: teal primary (`#0f7173`), gold accent (`#fabb5b`), navy sidebar (`#14213d`)
-- Jasne tło (`--background: 30 14% 95%`) zamiast ciemnego
-- Dodanie wariantu `.dark` z ciemnymi kolorami
-- Import fontu Montserrat obok Inter
-- Reguła `h1–h6 { font-family: 'Montserrat' }`
+### Autoryzacja
 
-#### 2. `tailwind.config.ts` — font families
-- Dodanie `fontFamily.sans` (Inter) i `fontFamily.heading` (Montserrat)
-- Reszta struktury bez zmian (colors, borderRadius, animations identyczne)
+- `AuthProvider` context z `onAuthStateChange` + `getSession`
+- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
+- `ProtectedRoute` component — brak sesji → redirect `/login`
+- Przycisk wylogowania w sidebarze
 
-#### 3. Ocena wpływu na UI
-- Sidebar, karty, przyciski, tekst — wszystko używa CSS variables, więc zmiana palety zadziała automatycznie
-- Nagłówki dostaną Montserrat przez regułę CSS base layer
-- Logo "MMORSKA" na login page — kolor tła się zmieni z ciemnego na jasny; może wymagać dostosowania, ale to osobna iteracja
+### Strona `/login`
 
+- Wyśrodkowane logo MMorska na ciemnym tle
+- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
+- Brak pól email/hasło
+
+### Layout z Sidebarem
+
+- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
+- Przycisk "Wyloguj" na dole
+- Kompaktowy, profesjonalny design
+
+### Strona `/jobs` — Ogłoszenia
+
+- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
+- Przycisk "Nowe ogłoszenie" → modal z formularzem
+- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
+- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
+- Liczba kandydatur pobierana z `hr.applications` (count per job)
+
+### Strona `/jobs/:id/applications` — Kandydatury
+
+- Nagłówek z nazwą stanowiska + link powrotny
+- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
+- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
+- Kliknięcie wiersza → drawer boczny
+
+### Drawer kandydata
+
+- Dane kontaktowe: imię, nazwisko, email, telefon
+- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
+- List motywacyjny (przewijany)
+- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
+- Edytowalne pole "Notatki rekrutera" z zapisem inline
+- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
+- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
+- Historia statusów — chronologiczna lista zmian
+
+### Strona `/settings` — Ustawienia formularza
+
+- Formularz z polami z `hr.form_config` (klucz-wartość)
+- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
+- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
+
+### Ważne szczegóły techniczne
+
+- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
+- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
+- Brak jakiegokolwiek email/password auth w kodzie
+- Status change = UPDATE + INSERT log (atomowo)

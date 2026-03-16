@@ -2253,6 +2253,7 @@ export type Database = {
           }
         | { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_app_admin: { Args: never; Returns: boolean }
+      is_current_user_admin: { Args: never; Returns: boolean }
       map_infinity_status: {
         Args: { raw_status: string }
         Returns: Database["public"]["Enums"]["infinity_status_enum"]
