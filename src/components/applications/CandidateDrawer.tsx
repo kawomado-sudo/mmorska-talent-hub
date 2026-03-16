@@ -33,14 +33,12 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const [notes, setNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
   const [showCvPreview, setShowCvPreview] = useState(false);
-  const [showReviewerSelect, setShowReviewerSelect] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>('');
 
   useEffect(() => {
     if (application) {
       setNotes(application.recruiter_notes || '');
       setCvSignedUrl(null);
-      setShowReviewerSelect(false);
       setSelectedReviewerId('');
       const cvPath = application.cv_url;
       if (cvPath && !cvPath.startsWith('http')) {
@@ -101,8 +99,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
       queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
       queryClient.invalidateQueries({ queryKey: ['status-history', application?.id] });
       toast.success('Kandydat przypisany do recenzenta');
-      setShowReviewerSelect(false);
-      onClose();
     },
     onError: () => toast.error('Nie udało się przypisać recenzenta'),
   });
@@ -120,16 +116,11 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     },
   });
 
-  if (!application) return null;
-
   const handleStatusClick = (statusValue: string) => {
-    if (statusValue === 'reviewing' && !isReviewer) {
-      // Show reviewer select instead of immediately changing status
-      setShowReviewerSelect(true);
-      return;
-    }
     statusMutation.mutate(statusValue);
   };
+
+  const filteredTeamMembers = (teamMembers || []).filter((m: any) => m.auth_user_id != null);
 
   // Reviewer sees only Accept/Reject buttons
   const visibleActions = isReviewer
@@ -204,6 +195,43 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
           <Separator />
 
+          {/* Reviewer assignment - visible for managers/admins */}
+          {!isReviewer && (
+            <div>
+              <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                <UserCheck className="h-4 w-4 text-primary" />
+                Przypisz recenzenta
+              </div>
+              {application.assigned_reviewer_id && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  Aktualnie przypisany: <span className="font-medium text-foreground">{application.assigned_reviewer_id}</span>
+                </p>
+              )}
+              <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Wybierz recenzenta..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredTeamMembers.map((m: any) => (
+                    <SelectItem key={m.auth_user_id} value={m.auth_user_id}>
+                      {m.full_name} ({m.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                className="mt-2"
+                onClick={() => assignReviewerMutation.mutate()}
+                disabled={!selectedReviewerId || assignReviewerMutation.isPending}
+              >
+                Przypisz
+              </Button>
+            </div>
+          )}
+
+          <Separator />
+
           <div>
             <h3 className="mb-2 text-sm font-medium">Zmień status</h3>
             <div className="flex flex-wrap gap-2">
@@ -220,40 +248,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                 </Button>
               ))}
             </div>
-
-            {/* Reviewer assignment dialog inline */}
-            {showReviewerSelect && (
-              <div className="mt-3 rounded-md border bg-muted/50 p-3 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <UserCheck className="h-4 w-4 text-sky-400" />
-                  Przypisz recenzenta
-                </div>
-                <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Wybierz recenzenta..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teamMembers?.map((m: any) => (
-                      <SelectItem key={m.auth_user_id} value={m.auth_user_id}>
-                        {m.full_name} ({m.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => assignReviewerMutation.mutate()}
-                    disabled={!selectedReviewerId || assignReviewerMutation.isPending}
-                  >
-                    Przypisz i zmień status
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowReviewerSelect(false)}>
-                    Anuluj
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
           {statusHistory && statusHistory.length > 0 && (
