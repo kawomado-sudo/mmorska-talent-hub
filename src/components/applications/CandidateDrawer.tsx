@@ -96,6 +96,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   if (!application) return null;
 
   return (
+    <>
     <Sheet open={!!application} onOpenChange={() => onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
