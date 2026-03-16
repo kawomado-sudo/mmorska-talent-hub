@@ -2,7 +2,6 @@ import { supabaseAuth } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import morskaLogo from '@/assets/mmorska-logo.png';
 
 const Login = () => {
   const { session, loading } = useAuth();
