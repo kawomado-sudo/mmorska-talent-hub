@@ -233,9 +233,9 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                     <SelectValue placeholder="Wybierz recenzenta..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {reviewers?.map((r: any) => (
-                      <SelectItem key={r.auth_user_id} value={r.auth_user_id}>
-                        {r.full_name} ({r.email})
+                    {teamMembers?.map((m: any) => (
+                      <SelectItem key={m.auth_user_id} value={m.auth_user_id}>
+                        {m.full_name} ({m.email})
                       </SelectItem>
                     ))}
                   </SelectContent>

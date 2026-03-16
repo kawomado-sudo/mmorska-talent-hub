@@ -203,15 +203,37 @@ Deno.serve(async (req) => {
         // params: application_id, reviewer_id (auth_user_id of reviewer)
         const { application_id, reviewer_id } = params;
 
-        // Get current status
+        // Get current application status
         const { data: app, error: appErr } = await db
           .from("applications")
-          .select("status")
+          .select("status, first_name, last_name, job_id")
           .eq("id", application_id)
           .single();
         if (appErr) throw appErr;
 
         const oldStatus = app.status;
+
+        // Get reviewer info from team_members_public
+        const { data: member, error: memErr } = await dbPublic
+          .from("team_members_public")
+          .select("auth_user_id, full_name, email")
+          .eq("auth_user_id", reviewer_id)
+          .single();
+        if (memErr) throw memErr;
+
+        // Auto-add to hr_reviewers if not already there (upsert)
+        const { error: upsertErr } = await db
+          .from("hr_reviewers")
+          .upsert(
+            {
+              auth_user_id: member.auth_user_id,
+              full_name: member.full_name,
+              email: member.email,
+              active: true,
+            },
+            { onConflict: "auth_user_id" }
+          );
+        if (upsertErr) throw upsertErr;
 
         // Update application: set status to reviewing + assign reviewer
         const { error: updErr } = await db
@@ -234,6 +256,45 @@ Deno.serve(async (req) => {
             changed_by: userId,
           });
         if (logErr) throw logErr;
+
+        // Get job title for email
+        const { data: job } = await db
+          .from("jobs")
+          .select("title")
+          .eq("id", app.job_id)
+          .single();
+
+        // Send email notification to reviewer via Resend
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        if (resendKey && member.email) {
+          try {
+            const candidateName = `${app.first_name || ''} ${app.last_name || ''}`.trim();
+            const jobTitle = job?.title || 'Nieznane stanowisko';
+            await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${resendKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from: "MMorska HR <onboarding@resend.dev>",
+                to: [member.email],
+                subject: `Nowe zadanie: ocena kandydata — ${candidateName}`,
+                html: `
+                  <h2>Zostałeś przypisany jako recenzent</h2>
+                  <p><strong>Kandydat:</strong> ${candidateName}</p>
+                  <p><strong>Stanowisko:</strong> ${jobTitle}</p>
+                  <p>Zaloguj się do panelu rekrutacyjnego, aby przejrzeć kandydaturę i podjąć decyzję.</p>
+                  <br/>
+                  <p style="color:#888;font-size:12px;">MMorska — Panel Rekrutacyjny</p>
+                `,
+              }),
+            });
+          } catch (emailErr) {
+            console.error("Failed to send reviewer notification email:", emailErr);
+            // Don't fail the assignment if email fails
+          }
+        }
 
         return json({ ok: true });
       }
