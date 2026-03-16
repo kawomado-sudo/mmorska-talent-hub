@@ -202,5 +202,21 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
         </div>
       </SheetContent>
     </Sheet>
+
+    <Dialog open={showCvPreview} onOpenChange={setShowCvPreview}>
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2">
+          <DialogTitle>CV — {application.first_name} {application.last_name}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 px-6 pb-6">
+          <iframe
+            src={cvSignedUrl || ''}
+            className="w-full h-full rounded-md border"
+            title="Podgląd CV"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
