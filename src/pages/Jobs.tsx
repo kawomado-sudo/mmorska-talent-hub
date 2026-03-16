@@ -142,16 +142,18 @@ const Jobs = () => {
                   </p>
                 )}
               </CardContent>
-              <CardFooter className="pt-0">
-                <div className="flex gap-1 ml-auto">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleEdit(e, job)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleDelete(e, job.id)}>
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
-                </div>
-              </CardFooter>
+              {isAdmin && (
+                <CardFooter className="pt-0">
+                  <div className="flex gap-1 ml-auto">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleEdit(e, job)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleDelete(e, job.id)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </CardFooter>
+              )}
             </Card>
           ))}
         </div>
