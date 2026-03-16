@@ -31,6 +31,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
+  const [showCvPreview, setShowCvPreview] = useState(false);
 
   useEffect(() => {
     if (application) {
