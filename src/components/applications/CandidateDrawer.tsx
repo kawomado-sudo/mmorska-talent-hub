@@ -4,12 +4,13 @@ import { hrApi } from '@/lib/hr-api';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sparkles, Download, ExternalLink, Save } from 'lucide-react';
+import { Sparkles, Download, ExternalLink, Save, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CandidateDrawerProps {
@@ -30,6 +31,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
+  const [showCvPreview, setShowCvPreview] = useState(false);
 
   useEffect(() => {
     if (application) {
@@ -94,6 +96,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   if (!application) return null;
 
   return (
+    <>
     <Sheet open={!!application} onOpenChange={() => onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
@@ -107,7 +110,10 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
           </div>
 
           {cvSignedUrl && (
-            <div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowCvPreview(true)} className="gap-2">
+                <Eye className="h-4 w-4" /> Podgląd CV
+              </Button>
               {application.cv_link ? (
                 <Button variant="outline" size="sm" asChild>
                   <a href={application.cv_link} target="_blank" rel="noreferrer" className="gap-2">
@@ -197,5 +203,21 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
         </div>
       </SheetContent>
     </Sheet>
+
+    <Dialog open={showCvPreview} onOpenChange={setShowCvPreview}>
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2">
+          <DialogTitle>CV — {application.first_name} {application.last_name}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 px-6 pb-6">
+          <iframe
+            src={cvSignedUrl || ''}
+            className="w-full h-full rounded-md border"
+            title="Podgląd CV"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
