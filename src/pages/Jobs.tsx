@@ -40,6 +40,7 @@ const statusFilters = [
 const Jobs = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [filter, setFilter] = useState('active');
