@@ -127,6 +127,8 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     ? statusActions.filter((s) => s.value === 'accepted' || s.value === 'rejected')
     : statusActions;
 
+  if (!application) return null;
+
   return (
     <>
     <Sheet open={!!application} onOpenChange={() => onClose()}>
