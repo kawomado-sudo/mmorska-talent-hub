@@ -1866,6 +1866,66 @@ export type Database = {
         }
         Relationships: []
       }
+      lov_announcements: {
+        Row: {
+          author_name: string | null
+          content: string | null
+          created_at: string | null
+          id: string | null
+          priority: number | null
+          title: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string | null
+          priority?: number | null
+          title?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string | null
+          priority?: number | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+      lov_app_shortcuts: {
+        Row: {
+          avatar_url: string | null
+          color: string | null
+          description: string | null
+          icon: string | null
+          id: string | null
+          name: string | null
+          sort_order: number | null
+          url: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          color?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string | null
+          name?: string | null
+          sort_order?: number | null
+          url?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          color?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string | null
+          name?: string | null
+          sort_order?: number | null
+          url?: string | null
+        }
+        Relationships: []
+      }
       staff_orders_edit_view: {
         Row: {
           assigned_to: string | null
