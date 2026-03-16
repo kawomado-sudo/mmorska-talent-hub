@@ -33,14 +33,12 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const [notes, setNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
   const [showCvPreview, setShowCvPreview] = useState(false);
-  const [showReviewerSelect, setShowReviewerSelect] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>('');
 
   useEffect(() => {
     if (application) {
       setNotes(application.recruiter_notes || '');
       setCvSignedUrl(null);
-      setShowReviewerSelect(false);
       setSelectedReviewerId('');
       const cvPath = application.cv_url;
       if (cvPath && !cvPath.startsWith('http')) {
