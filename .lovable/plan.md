@@ -1,71 +1,70 @@
+## MMorska — Wewnętrzny Panel Rekrutera
 
+### Przegląd
 
-## Workflow: Przypisanie kandydata do recenzenta
+Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
 
-### Opis procesu
-1. Admin w Ustawieniach zarządza pulą recenzentów (pracowników z `team_members_public` którzy mogą oceniać kandydatów)
-2. Rekruter przy zmianie statusu na "W ocenie" wybiera recenzenta z listy
-3. Recenzent loguje się do tej samej aplikacji, ale widzi **tylko przypisane do niego** kandydatury
-4. Recenzent akceptuje → status zmienia się na "accepted", odrzuca → "rejected"
+### Konfiguracja
 
-### Zmiany w bazie danych
+1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
+2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
+3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
+4. **Font Inter** — import z Google Fonts
 
-#### 1. Tabela `hr.hr_reviewers` — pula recenzentów
-```sql
-CREATE TABLE hr.hr_reviewers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  auth_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name text NOT NULL,
-  email text NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE (auth_user_id)
-);
-```
+### Autoryzacja
 
-#### 2. Kolumna `assigned_reviewer_id` w `hr.applications`
-```sql
-ALTER TABLE hr.applications 
-  ADD COLUMN assigned_reviewer_id uuid REFERENCES auth.users(id);
-```
+- `AuthProvider` context z `onAuthStateChange` + `getSession`
+- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
+- `ProtectedRoute` component — brak sesji → redirect `/login`
+- Przycisk wylogowania w sidebarze
 
-### Zmiany w Edge Function `hr-api`
+### Strona `/login`
 
-Nowe akcje:
-- `list_reviewers` — zwraca aktywnych recenzentów (do selecta)
-- `add_reviewer` / `remove_reviewer` — zarządzanie pulą (admin)
-- `list_my_reviews` — zwraca kandydatury przypisane do zalogowanego użytkownika (dla recenzenta)
-- `assign_reviewer` — przypisanie recenzenta do kandydatury (zmiana statusu na "reviewing" + ustawienie `assigned_reviewer_id`)
+- Wyśrodkowane logo MMorska na ciemnym tle
+- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
+- Brak pól email/hasło
 
-Modyfikacja `list_applications` — jeśli użytkownik jest recenzentem (nie adminem/managerem), filtrować wyniki po `assigned_reviewer_id = userId`.
+### Layout z Sidebarem
 
-### Zmiany w UI
+- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
+- Przycisk "Wyloguj" na dole
+- Kompaktowy, profesjonalny design
 
-#### 1. Strona `/settings` — sekcja "Recenzenci"
-- Lista aktywnych recenzentów (imię, email, przycisk usuń)
-- Select z pracownikami z `team_members_public` + przycisk "Dodaj"
+### Strona `/jobs` — Ogłoszenia
 
-#### 2. `CandidateDrawer.tsx` — przypisanie recenzenta
-- Przy kliknięciu "W ocenie" pojawia się select z listą recenzentów
-- Po wyborze → `assign_reviewer` (update status + assigned_reviewer_id + log)
+- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
+- Przycisk "Nowe ogłoszenie" → modal z formularzem
+- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
+- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
+- Liczba kandydatur pobierana z `hr.applications` (count per job)
 
-#### 3. Widok recenzenta
-- Recenzent widzi ten sam layout, ale `list_applications` zwraca mu tylko przypisane kandydatury
-- W drawerze widzi tylko przyciski "Akceptuj" i "Odrzuć" (bez pełnego zestawu statusów)
-- Sidebar: recenzent widzi tylko "Ogłoszenia" (bez "Ustawienia")
+### Strona `/jobs/:id/applications` — Kandydatury
 
-#### 4. `AppLayout.tsx` — warunkowy sidebar
-- Sprawdzenie roli z `AuthContext`: admin/manager widzi Ustawienia, recenzent nie
+- Nagłówek z nazwą stanowiska + link powrotny
+- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
+- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
+- Kliknięcie wiersza → drawer boczny
 
-#### 5. `AuthContext.tsx` — rozpoznawanie recenzenta
-- `loadProfile` sprawdza też `hr.hr_reviewers` — jeśli user jest recenzentem, ustawia `role: 'reviewer'`
+### Drawer kandydata
 
-### Podsumowanie zmian plików
-- **Migracja SQL**: tabela `hr.hr_reviewers`, kolumna `assigned_reviewer_id`
-- **`hr-api/index.ts`**: 5 nowych akcji
-- **`SettingsPage.tsx`**: sekcja zarządzania recenzentami
-- **`CandidateDrawer.tsx`**: select recenzenta przy "W ocenie"
-- **`Applications.tsx`**: filtrowanie dla recenzenta
-- **`AppLayout.tsx`**: warunkowy sidebar
-- **`AuthContext.tsx`**: wykrywanie roli recenzenta
+- Dane kontaktowe: imię, nazwisko, email, telefon
+- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
+- List motywacyjny (przewijany)
+- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
+- Edytowalne pole "Notatki rekrutera" z zapisem inline
+- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
+- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
+- Historia statusów — chronologiczna lista zmian
 
+### Strona `/settings` — Ustawienia formularza
+
+- Formularz z polami z `hr.form_config` (klucz-wartość)
+- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
+- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
+
+### Ważne szczegóły techniczne
+
+- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
+- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
+- Brak jakiegokolwiek email/password auth w kodzie
+- Status change = UPDATE + INSERT log (atomowo)

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { hrApi } from '@/lib/hr-api';
+import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -39,6 +40,7 @@ const Applications = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isReviewer } = useAuth();
   const [filter, setFilter] = useState('all');
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
@@ -50,8 +52,12 @@ const Applications = () => {
   });
 
   const { data: applications, isLoading } = useQuery({
-    queryKey: ['applications', jobId, filter],
-    queryFn: () => hrApi('list_applications', { job_id: jobId, status: filter }),
+    queryKey: ['applications', jobId, filter, isReviewer],
+    queryFn: () => hrApi('list_applications', {
+      job_id: jobId,
+      status: filter,
+      reviewer_only: isReviewer,
+    }),
   });
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -119,35 +125,43 @@ const Applications = () => {
           <ArrowLeft className="h-4 w-4" /> Ogłoszenia
         </Button>
         <h1 className="text-2xl font-bold">{job?.title || 'Kandydatury'}</h1>
-      </div>
-
-      <div
-        className={`mb-6 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-          dragOver ? 'border-primary bg-primary/5' : 'border-border'
-        } ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-      >
-        {uploading ? (
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Przetwarzanie CV przez AI...
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <FileUp className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Przeciągnij plik CV (PDF) lub{' '}
-              <label className="cursor-pointer text-primary underline underline-offset-2">
-                wybierz z dysku
-                <input type="file" accept=".pdf" className="hidden" onChange={handleFileInput} />
-              </label>
-            </p>
-            <p className="text-xs text-muted-foreground">AI automatycznie wyciągnie dane i oceni dopasowanie</p>
-          </div>
+        {isReviewer && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Widzisz tylko kandydatury przypisane do Twojej oceny.
+          </p>
         )}
       </div>
+
+      {/* Ukryj upload CV dla recenzenta */}
+      {!isReviewer && (
+        <div
+          className={`mb-6 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+            dragOver ? 'border-primary bg-primary/5' : 'border-border'
+          } ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+        >
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Przetwarzanie CV przez AI...
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <FileUp className="mx-auto h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Przeciągnij plik CV (PDF) lub{' '}
+                <label className="cursor-pointer text-primary underline underline-offset-2">
+                  wybierz z dysku
+                  <input type="file" accept=".pdf" className="hidden" onChange={handleFileInput} />
+                </label>
+              </p>
+              <p className="text-xs text-muted-foreground">AI automatycznie wyciągnie dane i oceni dopasowanie</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {statusFilters.map((s) => (
@@ -208,7 +222,7 @@ const Applications = () => {
               {applications?.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                    Brak kandydatur. Prześlij CV aby dodać kandydata.
+                    {isReviewer ? 'Brak przypisanych kandydatur do oceny.' : 'Brak kandydatur. Prześlij CV aby dodać kandydata.'}
                   </TableCell>
                 </TableRow>
               )}

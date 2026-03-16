@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, supabaseAuth, supabasePublic } from '@/integrations/supabase/client';
+import { hrApi } from '@/lib/hr-api';
 
 interface UserProfile {
   full_name: string;
   email: string;
-  role: 'admin' | 'manager' | 'recruiter' | 'viewer';
+  role: 'admin' | 'manager' | 'recruiter' | 'reviewer' | 'viewer';
   has_hr_access: boolean;
+  is_reviewer: boolean;
   avatar_url?: string;
 }
 
@@ -15,6 +17,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   isAdmin: boolean;
+  isReviewer: boolean;
   loading: boolean;
   signInWithAzure: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -33,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser]         = useState<User | null>(null);
   const [profile, setProfile]   = useState<UserProfile | null>(null);
   const [isAdmin, setIsAdmin]   = useState(false);
+  const [isReviewer, setIsReviewer] = useState(false);
   const [loading, setLoading]   = useState(true);
 
   const loadProfile = async (userId: string, email: string) => {
@@ -45,7 +49,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (!member || member.active !== true) {
-        setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false });
+        setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false, is_reviewer: false });
+        setIsReviewer(false);
         return;
       }
 
@@ -57,19 +62,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       const hasHrAccess = !!accessData && accessData.active === true;
-      const role = (hasHrAccess ? accessData.role : 'viewer') as UserProfile['role'];
+      let role = (hasHrAccess ? accessData.role : 'viewer') as UserProfile['role'];
 
+      // KROK 3 — sprawdź czy jest recenzentem (przez hr-api)
+      let reviewerFlag = false;
+      try {
+        const reviewerCheck = await hrApi('check_is_reviewer');
+        reviewerFlag = reviewerCheck?.is_reviewer === true;
+      } catch {
+        // Ignore — user may not be authenticated yet
+      }
+
+      // Jeśli nie ma HR access ale jest recenzentem, ustaw rolę reviewer
+      if (!hasHrAccess && reviewerFlag) {
+        role = 'reviewer';
+      }
+
+      setIsReviewer(reviewerFlag);
       setProfile({
         full_name:     member.full_name || email.split('@')[0],
         email,
         avatar_url:    member.avatar_url ?? undefined,
         role,
-        has_hr_access: hasHrAccess,
+        has_hr_access: hasHrAccess || reviewerFlag,
+        is_reviewer:   reviewerFlag,
       });
       setIsAdmin(role === 'admin' || role === 'manager');
     } catch (e) {
       console.error('loadProfile error:', e);
-      setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false });
+      setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false, is_reviewer: false });
     } finally {
       setLoading(false);
     }
@@ -88,6 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setProfile(null);
         setIsAdmin(false);
+        setIsReviewer(false);
         setLoading(false);
       }
     });
@@ -117,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, isAdmin, loading, signInWithAzure, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, isAdmin, isReviewer, loading, signInWithAzure, signOut }}>
       {children}
     </AuthContext.Provider>
   );
