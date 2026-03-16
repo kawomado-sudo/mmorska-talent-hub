@@ -109,7 +109,10 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
           </div>
 
           {cvSignedUrl && (
-            <div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowCvPreview(true)} className="gap-2">
+                <Eye className="h-4 w-4" /> Podgląd CV
+              </Button>
               {application.cv_link ? (
                 <Button variant="outline" size="sm" asChild>
                   <a href={application.cv_link} target="_blank" rel="noreferrer" className="gap-2">
