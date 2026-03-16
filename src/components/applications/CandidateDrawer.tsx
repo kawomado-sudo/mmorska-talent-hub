@@ -59,9 +59,9 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     enabled: !!application,
   });
 
-  const { data: reviewers } = useQuery({
-    queryKey: ['reviewers'],
-    queryFn: () => hrApi('list_reviewers'),
+  const { data: teamMembers } = useQuery({
+    queryKey: ['team-members'],
+    queryFn: () => hrApi('list_team_members'),
     enabled: !!application && !isReviewer,
   });
 
