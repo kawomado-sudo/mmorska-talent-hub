@@ -2,7 +2,6 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Briefcase, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import morskaLogo from '@/assets/mmorska-logo.png';
 
 export const AppLayout = () => {
   const { signOut, isReviewer, isAdmin } = useAuth();
