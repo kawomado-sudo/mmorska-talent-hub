@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Pencil, Trash2, Users, Calendar, Briefcase } from 'lucide-react';
 import { JobFormDialog } from '@/components/jobs/JobFormDialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface Job {
@@ -39,6 +40,7 @@ const statusFilters = [
 const Jobs = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [filter, setFilter] = useState('active');
@@ -76,10 +78,12 @@ const Jobs = () => {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Rekrutacje</h1>
-        <Button onClick={() => { setEditingJob(null); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nowe ogłoszenie
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => { setEditingJob(null); setDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nowe ogłoszenie
+          </Button>
+        )}
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
@@ -138,16 +142,18 @@ const Jobs = () => {
                   </p>
                 )}
               </CardContent>
-              <CardFooter className="pt-0">
-                <div className="flex gap-1 ml-auto">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleEdit(e, job)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleDelete(e, job.id)}>
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
-                </div>
-              </CardFooter>
+              {isAdmin && (
+                <CardFooter className="pt-0">
+                  <div className="flex gap-1 ml-auto">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleEdit(e, job)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleDelete(e, job.id)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </CardFooter>
+              )}
             </Card>
           ))}
         </div>

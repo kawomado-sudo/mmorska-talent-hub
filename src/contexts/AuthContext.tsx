@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, supabaseAuth, supabasePublic } from '@/integrations/supabase/client';
+import { supabaseAuth, supabasePublic } from '@/integrations/supabase/client';
 import { hrApi } from '@/lib/hr-api';
+
+const ADMIN_EMAILS = ['support@mmorska.pl', 'dobrochna.mankowska@mmorska.pl'];
 
 interface UserProfile {
   full_name: string;
@@ -41,53 +43,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadProfile = async (userId: string, email: string) => {
     try {
-      // KROK 1 — sanity check: czy pracownik aktywny?
+      // Pobierz dane z team_members_public
       const { data: member } = await supabasePublic
         .from('team_members_public')
         .select('full_name, avatar_url, active')
         .eq('auth_user_id', userId)
         .maybeSingle();
 
-      if (!member || member.active !== true) {
-        setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false, is_reviewer: false });
+      const fullName = member?.full_name || email.split('@')[0];
+      const avatarUrl = member?.avatar_url ?? undefined;
+
+      // Sprawdź czy admin (hardcoded lista)
+      const emailLower = email.toLowerCase();
+      if (ADMIN_EMAILS.includes(emailLower)) {
+        setProfile({
+          full_name: fullName,
+          email,
+          avatar_url: avatarUrl,
+          role: 'admin',
+          has_hr_access: true,
+          is_reviewer: false,
+        });
+        setIsAdmin(true);
         setIsReviewer(false);
         return;
       }
 
-      // KROK 2 — rola z hr.hr_user_access
-      const { data: accessData } = await supabase
-        .from('hr_user_access')
-        .select('role, active')
-        .eq('auth_user_id', userId)
-        .maybeSingle();
-
-      const hasHrAccess = !!accessData && accessData.active === true;
-      let role = (hasHrAccess ? accessData.role : 'viewer') as UserProfile['role'];
-
-      // KROK 3 — sprawdź czy jest recenzentem (przez hr-api)
+      // Nie-admin → sprawdź czy recenzent
       let reviewerFlag = false;
       try {
         const reviewerCheck = await hrApi('check_is_reviewer');
         reviewerFlag = reviewerCheck?.is_reviewer === true;
       } catch {
-        // Ignore — user may not be authenticated yet
-      }
-
-      // Jeśli nie ma HR access ale jest recenzentem, ustaw rolę reviewer
-      if (!hasHrAccess && reviewerFlag) {
-        role = 'reviewer';
+        // Ignore
       }
 
       setIsReviewer(reviewerFlag);
+      setIsAdmin(false);
       setProfile({
-        full_name:     member.full_name || email.split('@')[0],
+        full_name: fullName,
         email,
-        avatar_url:    member.avatar_url ?? undefined,
-        role,
-        has_hr_access: hasHrAccess || reviewerFlag,
-        is_reviewer:   reviewerFlag,
+        avatar_url: avatarUrl,
+        role: reviewerFlag ? 'reviewer' : 'viewer',
+        has_hr_access: reviewerFlag,
+        is_reviewer: reviewerFlag,
       });
-      setIsAdmin(role === 'admin' || role === 'manager');
     } catch (e) {
       console.error('loadProfile error:', e);
       setProfile({ full_name: email.split('@')[0], email, role: 'viewer', has_hr_access: false, is_reviewer: false });
@@ -99,7 +99,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const timeout = setTimeout(() => setLoading(false), 8000);
 
-    // supabaseAuth (bez schema override) — poprawna obsługa sesji OAuth
     const { data: { subscription } } = supabaseAuth.auth.onAuthStateChange((_event, newSession) => {
       clearTimeout(timeout);
       setSession(newSession);
