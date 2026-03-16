@@ -99,8 +99,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
       queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
       queryClient.invalidateQueries({ queryKey: ['status-history', application?.id] });
       toast.success('Kandydat przypisany do recenzenta');
-      setShowReviewerSelect(false);
-      onClose();
     },
     onError: () => toast.error('Nie udało się przypisać recenzenta'),
   });
