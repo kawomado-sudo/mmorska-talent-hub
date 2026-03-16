@@ -78,10 +78,12 @@ const Jobs = () => {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Rekrutacje</h1>
-        <Button onClick={() => { setEditingJob(null); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nowe ogłoszenie
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => { setEditingJob(null); setDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nowe ogłoszenie
+          </Button>
+        )}
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
