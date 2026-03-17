@@ -1,25 +1,70 @@
+## MMorska — Wewnętrzny Panel Rekrutera
 
+### Przegląd
 
-## Problem
+Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
 
-Tabela `hr.hr_reviewers` ma dwa problemy blokujące poprawne przypisanie recenzenta i wysyłkę emaila:
+### Konfiguracja
 
-1. Kolumna `auth_user_id` ma constraint `NOT NULL` — uniemożliwia dodanie pracownika który jeszcze się nie zalogował
-2. Brak `UNIQUE` constraint na kolumnie `email` — `ON CONFLICT (email)` w upsert nie działa
+1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
+2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
+3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
+4. **Font Inter** — import z Google Fonts
 
-Przez te błędy, flow `assign_reviewer` loguje errory i pomija wysyłkę emaila (bo upsert/insert do hr_reviewers failuje, ale jest w try/catch więc nie przerywa całej funkcji — jednak email jest wysyłany dopiero po tym bloku i zależy od poprawnego lookupu member).
+### Autoryzacja
 
-## Rozwiązanie
+- `AuthProvider` context z `onAuthStateChange` + `getSession`
+- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
+- `ProtectedRoute` component — brak sesji → redirect `/login`
+- Przycisk wylogowania w sidebarze
 
-### 1. Migracja SQL na tabeli `hr.hr_reviewers`
-```sql
--- Pozwól na NULL w auth_user_id
-ALTER TABLE hr.hr_reviewers ALTER COLUMN auth_user_id DROP NOT NULL;
+### Strona `/login`
 
--- Dodaj unique constraint na email (potrzebny dla ON CONFLICT)
-ALTER TABLE hr.hr_reviewers ADD CONSTRAINT hr_reviewers_email_unique UNIQUE (email);
-```
+- Wyśrodkowane logo MMorska na ciemnym tle
+- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
+- Brak pól email/hasło
 
-### 2. Brak zmian w Edge Function
-Kod w `hr-api/index.ts` jest już poprawny — robi `ON CONFLICT (email)` i wstawia `auth_user_id: null`. Po naprawieniu constraintów w bazie, upsert zadziała i email zostanie wysłany przez Maileroo.
+### Layout z Sidebarem
 
+- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
+- Przycisk "Wyloguj" na dole
+- Kompaktowy, profesjonalny design
+
+### Strona `/jobs` — Ogłoszenia
+
+- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
+- Przycisk "Nowe ogłoszenie" → modal z formularzem
+- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
+- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
+- Liczba kandydatur pobierana z `hr.applications` (count per job)
+
+### Strona `/jobs/:id/applications` — Kandydatury
+
+- Nagłówek z nazwą stanowiska + link powrotny
+- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
+- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
+- Kliknięcie wiersza → drawer boczny
+
+### Drawer kandydata
+
+- Dane kontaktowe: imię, nazwisko, email, telefon
+- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
+- List motywacyjny (przewijany)
+- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
+- Edytowalne pole "Notatki rekrutera" z zapisem inline
+- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
+- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
+- Historia statusów — chronologiczna lista zmian
+
+### Strona `/settings` — Ustawienia formularza
+
+- Formularz z polami z `hr.form_config` (klucz-wartość)
+- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
+- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
+
+### Ważne szczegóły techniczne
+
+- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
+- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
+- Brak jakiegokolwiek email/password auth w kodzie
+- Status change = UPDATE + INSERT log (atomowo)
