@@ -1,0 +1,1 @@
+ALTER TABLE hr.applications DROP CONSTRAINT applications_assigned_reviewer_id_fkey;
