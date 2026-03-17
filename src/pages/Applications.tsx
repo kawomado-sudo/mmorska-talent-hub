@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileUp, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileUp, Loader2, LayoutList, LayoutGrid } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
+import { KanbanBoard } from '@/components/applications/KanbanBoard';
 import { toast } from 'sonner';
 
 const statusFilters = [
@@ -19,6 +20,9 @@ const statusFilters = [
   { value: 'hold', label: 'Hold' },
   { value: 'accepted', label: 'Zaakceptowane' },
   { value: 'rejected', label: 'Odrzucone' },
+  { value: 'in_review', label: 'W recenzji' },
+  { value: 'screening_test', label: 'Screening test' },
+  { value: 'interview', label: 'Rozmowa' },
 ];
 
 const statusBadge: Record<string, { label: string; className: string }> = {
@@ -27,6 +31,9 @@ const statusBadge: Record<string, { label: string; className: string }> = {
   hold: { label: 'Hold', className: 'bg-amber-500 text-white border-amber-500' },
   accepted: { label: 'Zaakceptowane', className: 'bg-emerald-600 text-white border-emerald-600' },
   rejected: { label: 'Odrzucone', className: 'bg-red-600 text-white border-red-600' },
+  in_review: { label: 'W recenzji', className: 'bg-violet-600 text-white border-violet-600' },
+  screening_test: { label: 'Screening test', className: 'bg-indigo-600 text-white border-indigo-600' },
+  interview: { label: 'Rozmowa', className: 'bg-cyan-600 text-white border-cyan-600' },
 };
 
 const ratingColor = (rating: number | null) => {
@@ -45,6 +52,7 @@ const Applications = () => {
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
   const { data: job } = useQuery({
     queryKey: ['job', jobId],
@@ -163,21 +171,43 @@ const Applications = () => {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {statusFilters.map((s) => (
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          {statusFilters.map((s) => (
+            <Button
+              key={s.value}
+              variant={filter === s.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilter(s.value)}
+            >
+              {s.label}
+            </Button>
+          ))}
+        </div>
+        <div className="flex gap-1 ml-4">
           <Button
-            key={s.value}
-            variant={filter === s.value ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter(s.value)}
+            variant={viewMode === 'table' ? 'default' : 'outline'}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setViewMode('table')}
           >
-            {s.label}
+            <LayoutList className="h-4 w-4" />
           </Button>
-        ))}
+          <Button
+            variant={viewMode === 'kanban' ? 'default' : 'outline'}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setViewMode('kanban')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="text-muted-foreground">Ładowanie...</div>
+      ) : viewMode === 'kanban' ? (
+        <KanbanBoard applications={applications || []} onSelectApp={setSelectedApp} />
       ) : (
         <div className="rounded-lg border bg-card">
           <Table>

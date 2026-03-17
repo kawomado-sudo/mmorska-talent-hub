@@ -20,11 +20,17 @@ interface CandidateDrawerProps {
   jobId: string;
 }
 
-const statusActions = [
+const baseStatusActions = [
   { value: 'reviewing', label: 'W ocenie', className: 'bg-sky-600 text-white hover:bg-sky-700 border-sky-600' },
   { value: 'hold', label: 'Hold', className: 'bg-amber-500 text-white hover:bg-amber-600 border-amber-500' },
   { value: 'accepted', label: 'Zaakceptuj', className: 'bg-emerald-600 text-white hover:bg-emerald-700 border-emerald-600' },
   { value: 'rejected', label: 'Odrzuć', className: 'bg-red-600 text-white hover:bg-red-700 border-red-600' },
+];
+
+const advancedStatusActions = [
+  { value: 'in_review', label: 'W recenzji', className: 'bg-violet-600 text-white hover:bg-violet-700 border-violet-600' },
+  { value: 'screening_test', label: 'Screening test', className: 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600' },
+  { value: 'interview', label: 'Rozmowa', className: 'bg-cyan-600 text-white hover:bg-cyan-700 border-cyan-600' },
 ];
 
 export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawerProps) => {
@@ -124,8 +130,13 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
   // Reviewer sees only Accept/Reject buttons
   const visibleActions = isReviewer
-    ? statusActions.filter((s) => s.value === 'accepted' || s.value === 'rejected')
-    : statusActions;
+    ? baseStatusActions.filter((s) => s.value === 'accepted' || s.value === 'rejected')
+    : baseStatusActions;
+
+  // Advanced statuses visible only for accepted candidates (manager/admin only)
+  const canShowAdvanced = !isReviewer && application && 
+    ['accepted', 'in_review', 'screening_test', 'interview'].includes(application.status);
+  const advancedActions = canShowAdvanced ? advancedStatusActions : [];
 
   if (!application) return null;
 
@@ -252,6 +263,25 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                 </Button>
               ))}
             </div>
+            {advancedActions.length > 0 && (
+              <>
+                <h4 className="mt-3 mb-2 text-xs font-medium text-muted-foreground">Kolejny etap rekrutacji</h4>
+                <div className="flex flex-wrap gap-2">
+                  {advancedActions.map((s) => (
+                    <Button
+                      key={s.value}
+                      size="sm"
+                      variant="outline"
+                      className={`${s.className} ${application.status === s.value ? 'ring-2 ring-ring' : 'opacity-70'}`}
+                      onClick={() => handleStatusClick(s.value)}
+                      disabled={statusMutation.isPending || assignReviewerMutation.isPending}
+                    >
+                      {s.label}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {statusHistory && statusHistory.length > 0 && (

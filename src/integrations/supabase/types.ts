@@ -2298,6 +2298,16 @@ export type Database = {
           agent_phone: string
         }[]
       }
+      get_all_team_members_for_admin: {
+        Args: never
+        Returns: {
+          auth_user_id: string
+          email: string
+          first_name: string
+          full_name: string
+          last_name: string
+        }[]
+      }
       get_app_role: { Args: { p_app_slug: string }; Returns: string }
       get_current_agent_profile: {
         Args: never

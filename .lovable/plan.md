@@ -1,67 +1,70 @@
+## MMorska — Wewnętrzny Panel Rekrutera
 
+### Przegląd
 
-## Plan: Widok Kanban + nowe statusy rekrutacyjne
+Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
 
-### Kontekst
+### Konfiguracja
 
-Obecnie kandydatury wyświetlane są wyłącznie jako tabela z filtrami statusów. Statusy: `new`, `reviewing`, `hold`, `accepted`, `rejected`. User chce:
+1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
+2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
+3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
+4. **Font Inter** — import z Google Fonts
 
-1. **Nowe statusy** będące kolejnym etapem po zaakceptowaniu: `in_review` (W recenzji), `screening_test` (Screening test), `interview` (Rozmowa kwalifikacyjna)
-2. **Widok Kanban** — karty kandydatów pogrupowane w kolumnach wg statusu
-3. **Logika**: do nowych statusów mogą trafić tylko kandydaci zaakceptowani przez recenzenta/managera
+### Autoryzacja
 
-### Zmiany
+- `AuthProvider` context z `onAuthStateChange` + `getSession`
+- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
+- `ProtectedRoute` component — brak sesji → redirect `/login`
+- Przycisk wylogowania w sidebarze
 
-#### 1. Migracja bazy danych (schemat `hr`)
+### Strona `/login`
 
-Tabela `hr.applications` przechowuje status jako `text`. Nie ma enum — wystarczy dodać nowe wartości w kodzie. Migracja nie jest wymagana (status jest kolumną tekstową).
+- Wyśrodkowane logo MMorska na ciemnym tle
+- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
+- Brak pól email/hasło
 
-**Weryfikacja**: Sprawdzę czy kolumna `status` jest typu text czy enum. Jeśli enum, dodam nowe wartości.
+### Layout z Sidebarem
 
-#### 2. Aktualizacja statusów w kodzie
+- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
+- Przycisk "Wyloguj" na dole
+- Kompaktowy, profesjonalny design
 
-**Pliki**: `src/pages/Applications.tsx`, `src/components/applications/CandidateDrawer.tsx`
+### Strona `/jobs` — Ogłoszenia
 
-Dodać nowe statusy:
-- `in_review` — "W recenzji" (fioletowy)
-- `screening_test` — "Screening test" (indygo)  
-- `interview` — "Rozmowa kwalifikacyjna" (cyan)
+- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
+- Przycisk "Nowe ogłoszenie" → modal z formularzem
+- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
+- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
+- Liczba kandydatur pobierana z `hr.applications` (count per job)
 
-Rozszerzyć `statusFilters`, `statusBadge` i `statusActions` o nowe wartości.
+### Strona `/jobs/:id/applications` — Kandydatury
 
-#### 3. Widok Kanban — nowy komponent
+- Nagłówek z nazwą stanowiska + link powrotny
+- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
+- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
+- Kliknięcie wiersza → drawer boczny
 
-**Nowy plik**: `src/components/applications/KanbanBoard.tsx`
+### Drawer kandydata
 
-- Kolumny odpowiadające statusom (przewijane poziomo)
-- Karty z: imię/nazwisko, AI rating, badge statusu, skrót AI summary
-- Kliknięcie karty otwiera istniejący `CandidateDrawer`
-- Drag & drop (opcjonalnie w przyszłości) — na start bez, zmiana statusu przez drawer
+- Dane kontaktowe: imię, nazwisko, email, telefon
+- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
+- List motywacyjny (przewijany)
+- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
+- Edytowalne pole "Notatki rekrutera" z zapisem inline
+- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
+- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
+- Historia statusów — chronologiczna lista zmian
 
-#### 4. Przełącznik widoku tabela/kanban
+### Strona `/settings` — Ustawienia formularza
 
-**Plik**: `src/pages/Applications.tsx`
+- Formularz z polami z `hr.form_config` (klucz-wartość)
+- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
+- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
 
-- Dwa przyciski (ikony List/Grid) do przełączania widoku
-- Stan `viewMode: 'table' | 'kanban'`
-- Kanban pokazuje wszystkie statusy jako kolumny, tabela działa jak dotychczas
+### Ważne szczegóły techniczne
 
-#### 5. Logika ograniczeń statusów
-
-**Plik**: `src/components/applications/CandidateDrawer.tsx`
-
-- Przyciski nowych statusów (`in_review`, `screening_test`, `interview`) widoczne **tylko** gdy kandydat ma status `accepted`
-- Recenzent nadal widzi tylko `accepted`/`rejected`
-- Manager/admin widzi pełny zestaw przycisków zależnie od aktualnego statusu kandydata
-
-#### 6. Edge Function — brak zmian
-
-`hr-api` operuje na kolumnie `status` jako tekst — nowe wartości będą działać bez zmian w backendzie.
-
-### Kolejność implementacji
-
-1. Dodać nowe statusy do map w `Applications.tsx` i `CandidateDrawer.tsx`
-2. Utworzyć komponent `KanbanBoard.tsx`
-3. Dodać przełącznik widoku w `Applications.tsx`
-4. Dodać logikę ograniczeń przejść statusów w drawerze
-
+- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
+- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
+- Brak jakiegokolwiek email/password auth w kodzie
+- Status change = UPDATE + INSERT log (atomowo)
