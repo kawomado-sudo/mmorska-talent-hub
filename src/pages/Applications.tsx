@@ -206,6 +206,8 @@ const Applications = () => {
 
       {isLoading ? (
         <div className="text-muted-foreground">Ładowanie...</div>
+      ) : viewMode === 'kanban' ? (
+        <KanbanBoard applications={applications || []} onSelectApp={setSelectedApp} />
       ) : (
         <div className="rounded-lg border bg-card">
           <Table>

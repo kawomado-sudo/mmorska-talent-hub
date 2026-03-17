@@ -263,6 +263,25 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                 </Button>
               ))}
             </div>
+            {advancedActions.length > 0 && (
+              <>
+                <h4 className="mt-3 mb-2 text-xs font-medium text-muted-foreground">Kolejny etap rekrutacji</h4>
+                <div className="flex flex-wrap gap-2">
+                  {advancedActions.map((s) => (
+                    <Button
+                      key={s.value}
+                      size="sm"
+                      variant="outline"
+                      className={`${s.className} ${application.status === s.value ? 'ring-2 ring-ring' : 'opacity-70'}`}
+                      onClick={() => handleStatusClick(s.value)}
+                      disabled={statusMutation.isPending || assignReviewerMutation.isPending}
+                    >
+                      {s.label}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {statusHistory && statusHistory.length > 0 && (
