@@ -1,70 +1,35 @@
-## MMorska — Wewnętrzny Panel Rekrutera
 
-### Przegląd
 
-Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
+## Plan: Monit dla recenzenta bez przypisań + naprawa ciemnego ekranu
 
-### Konfiguracja
+### Problem 1: Ciemny ekran po zalogowaniu
 
-1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
-2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
-3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
-4. **Font Inter** — import z Google Fonts
+Przeanalizowałam kod i dane:
+- W bazie jest 1 aktywne ogłoszenie (status `active`) — powinno się wyświetlić
+- API (hr-api) działa poprawnie (logi sieciowe 200)
+- Konto dobrochna.mankowska@mmorska.pl jest na liście ADMIN_EMAILS → powinno mieć pełny dostęp
 
-### Autoryzacja
+**Potencjalna przyczyna**: Klient `supabasePublic` w `AuthContext.tsx` to osobna instancja Supabase, która **nie dziedziczy sesji** z `supabaseAuth`. Jeśli tabela `team_members_public` ma włączone RLS bez polityki SELECT dla anon, zapytanie o profil może się nie powieść. Dla admina to nie blokuje dostępu (profil ustawia się na podstawie ADMIN_EMAILS), ale może powodować opóźnienia lub ciche błędy.
 
-- `AuthProvider` context z `onAuthStateChange` + `getSession`
-- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
-- `ProtectedRoute` component — brak sesji → redirect `/login`
-- Przycisk wylogowania w sidebarze
+**Dodatkowy problem**: Brak obsługi błędów na stronach — jeśli `hrApi` rzuci wyjątek, strona nie pokazuje żadnego komunikatu.
 
-### Strona `/login`
+### Problem 2: Recenzent bez przypisań
 
-- Wyśrodkowane logo MMorska na ciemnym tle
-- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
-- Brak pól email/hasło
+Recenzent po zalogowaniu trafia na `/jobs`, widzi listę ogłoszeń, klika w jedno i na stronie kandydatur widzi pustą tabelę. Brakuje wyraźnego monitu.
 
-### Layout z Sidebarem
+### Zmiany
 
-- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
-- Przycisk "Wyloguj" na dole
-- Kompaktowy, profesjonalny design
+#### 1. `src/contexts/AuthContext.tsx`
+- Użyć `supabaseAuth` zamiast `supabasePublic` do zapytania o `team_members_public` (ten sam klient = ta sama sesja)
+- Dodać lepszą obsługę błędów w `loadProfile`
 
-### Strona `/jobs` — Ogłoszenia
+#### 2. `src/pages/Jobs.tsx`
+- Dla recenzenta (`isReviewer`) wyświetlić dedykowany widok z komunikatem: "Przejdź do przypisanych kandydatur" lub "Brak przypisanych recenzji"
+- Pokazywać tylko ogłoszenia, do których recenzent ma przypisane kandydatury (albo prosty monit z listą ogłoszeń)
 
-- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
-- Przycisk "Nowe ogłoszenie" → modal z formularzem
-- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
-- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
-- Liczba kandydatur pobierana z `hr.applications` (count per job)
+#### 3. `src/pages/Applications.tsx`  
+- Ulepszyć pusty stan dla recenzenta: wyraźny monit "Nie masz jeszcze przypisanych kandydatur do oceny w tym ogłoszeniu"
 
-### Strona `/jobs/:id/applications` — Kandydatury
+#### 4. Obsługa błędów API
+- Dodać `onError` w `useQuery` na stronach Jobs i Applications, żeby wyświetlać toast z komunikatem błędu zamiast ciemnego ekranu
 
-- Nagłówek z nazwą stanowiska + link powrotny
-- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
-- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
-- Kliknięcie wiersza → drawer boczny
-
-### Drawer kandydata
-
-- Dane kontaktowe: imię, nazwisko, email, telefon
-- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
-- List motywacyjny (przewijany)
-- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
-- Edytowalne pole "Notatki rekrutera" z zapisem inline
-- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
-- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
-- Historia statusów — chronologiczna lista zmian
-
-### Strona `/settings` — Ustawienia formularza
-
-- Formularz z polami z `hr.form_config` (klucz-wartość)
-- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
-- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
-
-### Ważne szczegóły techniczne
-
-- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
-- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
-- Brak jakiegokolwiek email/password auth w kodzie
-- Status change = UPDATE + INSERT log (atomowo)
