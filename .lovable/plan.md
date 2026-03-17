@@ -1,45 +1,70 @@
-## Problem
+## MMorska — Wewnętrzny Panel Rekrutera
 
-Email jest hardcoded w `hr-api/index.ts` (linie 300-318):
+### Przegląd
 
-- Nadawca: `hr@mmorska.pl` (przez Maileroo HTTP API)
-- Treść HTML: hardcoded w template string
+Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
 
-User chce:
+### Konfiguracja
 
-- Nadawca: `app.assistant@mmorska.eu`
-- Wysyłka przez SMTP (`smtp.maileroo.com:465`) z hasłem `76c8d120707fb6a6dc0033c5`
+1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
+2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
+3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
+4. **Font Inter** — import z Google Fonts
 
-## Analiza
+### Autoryzacja
 
-Maileroo wspiera **dwa sposoby** wysyłki:
+- `AuthProvider` context z `onAuthStateChange` + `getSession`
+- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
+- `ProtectedRoute` component — brak sesji → redirect `/login`
+- Przycisk wylogowania w sidebarze
 
-1. **HTTP API** (`https://smtp.maileroo.com/api/v2/emails`) — obecne podejście, używa `X-API-Key`
-2. **SMTP** — wymaga klienta SMTP w Deno (biblioteka `denomailer`)
+### Strona `/login`
 
-Zostajemy przy HTTP API ale zmienić adres nadawcy na `app.assistant@mmorska.eu`. Maileroo HTTP API pozwala ustawić dowolny `from` jeśli domena jest zweryfikowana. sending key: 4ba9757e1f8ca2984c5ebc28b62afc1bbd140076e859a24228613e64ae3733d8  
-identifier : **talent_app_lovable**
+- Wyśrodkowane logo MMorska na ciemnym tle
+- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
+- Brak pól email/hasło
 
-## Rozwiązanie
+### Layout z Sidebarem
 
-### Opcja rekomendowana: HTTP API ze zmienionym nadawcą
+- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
+- Przycisk "Wyloguj" na dole
+- Kompaktowy, profesjonalny design
 
-#### 1. `supabase/functions/hr-api/index.ts` — zmiana adresu nadawcy
+### Strona `/jobs` — Ogłoszenia
 
-- Linia 307: zmienić `hr@mmorska.pl` → `app.assistant@mmorska.eu`
-- Zmienić `display_name` na np. `"MMorska Rekrutacja"`
+- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
+- Przycisk "Nowe ogłoszenie" → modal z formularzem
+- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
+- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
+- Liczba kandydatur pobierana z `hr.applications` (count per job)
 
+### Strona `/jobs/:id/applications` — Kandydatury
 
+- Nagłówek z nazwą stanowiska + link powrotny
+- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
+- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
+- Kliknięcie wiersza → drawer boczny
 
-### Bezpieczeństwo
+### Drawer kandydata
 
-- Hasło SMTP NIE będzie hardcoded — zapisane jako Supabase secret
-- Deploy edge function po zmianie
+- Dane kontaktowe: imię, nazwisko, email, telefon
+- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
+- List motywacyjny (przewijany)
+- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
+- Edytowalne pole "Notatki rekrutera" z zapisem inline
+- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
+- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
+- Historia statusów — chronologiczna lista zmian
 
-### Treść emaila
+### Strona `/settings` — Ustawienia formularza
 
-Pozostaje bez zmian (chyba że user chce zmodyfikować):
+- Formularz z polami z `hr.form_config` (klucz-wartość)
+- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
+- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
 
-- Subject: `Nowe zadanie: ocena kandydata — {imię nazwisko}`
-- Body: informacja o przypisaniu do recenzji z nazwą kandydata i stanowiska  
-w emailu imie i nazwisko kandydata powinno byc w polowie zamienione na kroki, bo to dane wrazliwe
+### Ważne szczegóły techniczne
+
+- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
+- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
+- Brak jakiegokolwiek email/password auth w kodzie
+- Status change = UPDATE + INSERT log (atomowo)
