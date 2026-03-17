@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
                    <h2>Zostałeś przypisany jako recenzent</h2>
                    <p><strong>Kandydat:</strong> ${maskedName}</p>
                    <p><strong>Stanowisko:</strong> ${jobTitle}</p>
-                   <p>Zaloguj się do panelu rekrutacyjnego, aby przejrzeć kandydaturę i podjąć decyzję.</p>
+                   <p>Zaloguj się do <a href="https://praca.mmorska.eu" style="color:#2563eb;">panelu rekrutacyjnego</a>, aby przejrzeć kandydaturę i podjąć decyzję.</p>
                    <br/>
                    <p style="color:#888;font-size:12px;">MMorska — Panel Rekrutacyjny</p>
                  `,
