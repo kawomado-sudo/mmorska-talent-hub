@@ -171,17 +171,37 @@ const Applications = () => {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {statusFilters.map((s) => (
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          {statusFilters.map((s) => (
+            <Button
+              key={s.value}
+              variant={filter === s.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilter(s.value)}
+            >
+              {s.label}
+            </Button>
+          ))}
+        </div>
+        <div className="flex gap-1 ml-4">
           <Button
-            key={s.value}
-            variant={filter === s.value ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter(s.value)}
+            variant={viewMode === 'table' ? 'default' : 'outline'}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setViewMode('table')}
           >
-            {s.label}
+            <LayoutList className="h-4 w-4" />
           </Button>
-        ))}
+          <Button
+            variant={viewMode === 'kanban' ? 'default' : 'outline'}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setViewMode('kanban')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
