@@ -23,6 +23,7 @@ const statusFilters = [
   { value: 'in_review', label: 'W recenzji' },
   { value: 'screening_test', label: 'Screening test' },
   { value: 'interview', label: 'Rozmowa' },
+  { value: 'offer', label: 'Oferta' },
 ];
 
 const statusBadge: Record<string, { label: string; className: string }> = {
