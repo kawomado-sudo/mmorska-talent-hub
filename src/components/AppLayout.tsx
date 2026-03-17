@@ -14,7 +14,7 @@ export const AppLayout = () => {
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-56 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-        <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
+        <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4 mt-4">
           <span className="font-heading text-lg font-bold text-sidebar-foreground">MMorska Talent Hub</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-2">
