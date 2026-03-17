@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabaseAuth, supabasePublic } from '@/integrations/supabase/client';
+import { supabaseAuth } from '@/integrations/supabase/client';
 import { hrApi } from '@/lib/hr-api';
 
 const ADMIN_EMAILS = ['support@mmorska.pl', 'dobrochna.mankowska@mmorska.pl'];
