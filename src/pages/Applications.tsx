@@ -62,10 +62,10 @@ const Applications = () => {
   });
 
   const { data: applications, isLoading } = useQuery({
-    queryKey: ['applications', jobId, filter, isReviewer],
+    queryKey: ['applications', jobId, viewMode === 'kanban' ? 'all' : filter, isReviewer],
     queryFn: () => hrApi('list_applications', {
       job_id: jobId,
-      status: filter,
+      status: viewMode === 'kanban' ? 'all' : filter,
       reviewer_only: isReviewer,
     }),
   });
