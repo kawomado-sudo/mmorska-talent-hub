@@ -45,10 +45,16 @@ const Jobs = () => {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [filter, setFilter] = useState('active');
 
-  const { data: jobs, isLoading } = useQuery({
+  const { data: jobs, isLoading, isError } = useQuery({
     queryKey: ['jobs'],
     queryFn: () => hrApi<Job[]>('list_jobs'),
+    meta: { errorMessage: 'Nie udało się pobrać ogłoszeń' },
   });
+
+  // Show toast on error
+  if (isError) {
+    // toast handled via query meta or we show inline
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => hrApi('delete_job', { id }),
