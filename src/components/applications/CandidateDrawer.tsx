@@ -206,7 +206,9 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
               </div>
               {application.assigned_reviewer_id && (
                 <p className="text-xs text-muted-foreground mb-2">
-                  Aktualnie przypisany: <span className="font-medium text-foreground">{application.assigned_reviewer_id}</span>
+                  Aktualnie przypisany: <span className="font-medium text-foreground">
+                    {filteredTeamMembers.find((m: any) => m.id === application.assigned_reviewer_id || m.auth_user_id === application.assigned_reviewer_id)?.full_name || application.assigned_reviewer_id}
+                  </span>
                 </p>
               )}
               <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
@@ -215,7 +217,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                 </SelectTrigger>
                 <SelectContent>
                   {filteredTeamMembers.map((m: any) => (
-                    <SelectItem key={m.auth_user_id} value={m.auth_user_id}>
+                    <SelectItem key={m.id} value={m.id}>
                       {m.full_name} ({m.email})
                     </SelectItem>
                   ))}
