@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabaseAuth, supabasePublic } from '@/integrations/supabase/client';
+import { supabaseAuth } from '@/integrations/supabase/client';
 import { hrApi } from '@/lib/hr-api';
 
 const ADMIN_EMAILS = ['support@mmorska.pl', 'dobrochna.mankowska@mmorska.pl'];
@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadProfile = async (userId: string, email: string) => {
     try {
       // Pobierz dane z team_members_public
-      const { data: member } = await supabasePublic
+      const { data: member } = await supabaseAuth
         .from('team_members_public')
         .select('full_name, avatar_url, active')
         .eq('auth_user_id', userId)

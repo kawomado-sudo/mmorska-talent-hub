@@ -40,15 +40,21 @@ const statusFilters = [
 const Jobs = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isReviewer } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [filter, setFilter] = useState('active');
 
-  const { data: jobs, isLoading } = useQuery({
+  const { data: jobs, isLoading, isError } = useQuery({
     queryKey: ['jobs'],
     queryFn: () => hrApi<Job[]>('list_jobs'),
+    meta: { errorMessage: 'Nie udało się pobrać ogłoszeń' },
   });
+
+  // Show toast on error
+  if (isError) {
+    // toast handled via query meta or we show inline
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => hrApi('delete_job', { id }),
@@ -101,6 +107,16 @@ const Jobs = () => {
 
       {isLoading ? (
         <div className="text-muted-foreground">Ładowanie...</div>
+      ) : isError ? (
+        <div className="text-center py-16 space-y-2">
+          <p className="text-destructive font-medium">Nie udało się pobrać ogłoszeń</p>
+          <p className="text-sm text-muted-foreground">Sprawdź połączenie i odśwież stronę.</p>
+        </div>
+      ) : isReviewer && (!filteredJobs || filteredJobs.length === 0) ? (
+        <div className="text-center text-muted-foreground py-16 space-y-2">
+          <p className="font-medium text-foreground">Brak przypisanych recenzji</p>
+          <p className="text-sm">Nie masz jeszcze przypisanych kandydatur do oceny. Skontaktuj się z administratorem.</p>
+        </div>
       ) : filteredJobs?.length === 0 ? (
         <div className="text-center text-muted-foreground py-16">
           Brak ogłoszeń w tej kategorii. Dodaj pierwsze ogłoszenie.
