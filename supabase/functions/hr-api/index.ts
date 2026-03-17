@@ -295,7 +295,15 @@ Deno.serve(async (req) => {
         const mailerooKey = Deno.env.get("MAILEROO_API_KEY");
         if (mailerooKey && member.email) {
           try {
-            const candidateName = `${app.first_name || ''} ${app.last_name || ''}`.trim();
+            const firstName = app.first_name || '';
+            const lastName = app.last_name || '';
+            // Mask half of each name with dots for privacy
+            const maskHalf = (s: string) => {
+              if (!s) return '';
+              const half = Math.ceil(s.length / 2);
+              return s.slice(0, half) + '•'.repeat(s.length - half);
+            };
+            const maskedName = `${maskHalf(firstName)} ${maskHalf(lastName)}`.trim();
             const jobTitle = job?.title || 'Nieznane stanowisko';
             await fetch("https://smtp.maileroo.com/api/v2/emails", {
               method: "POST",
@@ -304,17 +312,17 @@ Deno.serve(async (req) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                from: { address: "hr@mmorska.pl", display_name: "MMorska HR" },
+                from: { address: "app.assistant@mmorska.eu", display_name: "MMorska Rekrutacja" },
                 to: [{ address: member.email, display_name: member.full_name || "" }],
-                subject: `Nowe zadanie: ocena kandydata — ${candidateName}`,
+                subject: `Nowe zadanie: ocena kandydata — ${maskedName}`,
                 html: `
-                  <h2>Zostałeś przypisany jako recenzent</h2>
-                  <p><strong>Kandydat:</strong> ${candidateName}</p>
-                  <p><strong>Stanowisko:</strong> ${jobTitle}</p>
-                  <p>Zaloguj się do panelu rekrutacyjnego, aby przejrzeć kandydaturę i podjąć decyzję.</p>
-                  <br/>
-                  <p style="color:#888;font-size:12px;">MMorska — Panel Rekrutacyjny</p>
-                `,
+                   <h2>Zostałeś przypisany jako recenzent</h2>
+                   <p><strong>Kandydat:</strong> ${maskedName}</p>
+                   <p><strong>Stanowisko:</strong> ${jobTitle}</p>
+                   <p>Zaloguj się do panelu rekrutacyjnego, aby przejrzeć kandydaturę i podjąć decyzję.</p>
+                   <br/>
+                   <p style="color:#888;font-size:12px;">MMorska — Panel Rekrutacyjny</p>
+                 `,
               }),
             });
           } catch (emailErr) {
