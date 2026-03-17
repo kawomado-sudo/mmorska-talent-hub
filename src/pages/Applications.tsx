@@ -22,11 +22,11 @@ const statusFilters = [
 ];
 
 const statusBadge: Record<string, { label: string; className: string }> = {
-  new: { label: 'Nowe', className: 'bg-blue-900/50 text-blue-400 border-blue-800' },
-  reviewing: { label: 'W ocenie', className: 'bg-sky-900/50 text-sky-400 border-sky-800' },
-  hold: { label: 'Hold', className: 'bg-yellow-900/50 text-yellow-400 border-yellow-800' },
-  accepted: { label: 'Zaakceptowane', className: 'bg-emerald-900/50 text-emerald-400 border-emerald-800' },
-  rejected: { label: 'Odrzucone', className: 'bg-red-900/50 text-red-400 border-red-800' },
+  new: { label: 'Nowe', className: 'bg-blue-600 text-white border-blue-600' },
+  reviewing: { label: 'W ocenie', className: 'bg-sky-600 text-white border-sky-600' },
+  hold: { label: 'Hold', className: 'bg-amber-500 text-white border-amber-500' },
+  accepted: { label: 'Zaakceptowane', className: 'bg-emerald-600 text-white border-emerald-600' },
+  rejected: { label: 'Odrzucone', className: 'bg-red-600 text-white border-red-600' },
 };
 
 const ratingColor = (rating: number | null) => {
