@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadProfile = async (userId: string, email: string) => {
     try {
       // Pobierz dane z team_members_public
-      const { data: member } = await supabasePublic
+      const { data: member } = await supabaseAuth
         .from('team_members_public')
         .select('full_name, avatar_url, active')
         .eq('auth_user_id', userId)
