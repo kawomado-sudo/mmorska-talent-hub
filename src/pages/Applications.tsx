@@ -52,6 +52,7 @@ const Applications = () => {
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
   const { data: job } = useQuery({
     queryKey: ['job', jobId],
