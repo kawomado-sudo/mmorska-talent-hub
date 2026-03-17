@@ -119,9 +119,21 @@ Deno.serve(async (req) => {
         if (params.status && params.status !== "all") {
           query = query.eq("status", params.status);
         }
-        // If reviewer_only flag is set, filter by assigned_reviewer_id
+        // If reviewer_only flag is set, filter by assigned_reviewer_id (auth_user_id OR team_member_id)
         if (params.reviewer_only) {
-          query = query.eq("assigned_reviewer_id", userId);
+          // First find team_member_id for this user
+          const { data: tm } = await dbPublic
+            .from("team_members_public")
+            .select("id")
+            .eq("auth_user_id", userId)
+            .maybeSingle();
+          
+          if (tm) {
+            // Match either auth_user_id or team_member_id
+            query = query.or(`assigned_reviewer_id.eq.${userId},assigned_reviewer_id.eq.${tm.id}`);
+          } else {
+            query = query.eq("assigned_reviewer_id", userId);
+          }
         }
         const { data, error } = await query;
         if (error) throw error;
