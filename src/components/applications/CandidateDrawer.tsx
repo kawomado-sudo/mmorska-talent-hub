@@ -130,8 +130,13 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
   // Reviewer sees only Accept/Reject buttons
   const visibleActions = isReviewer
-    ? statusActions.filter((s) => s.value === 'accepted' || s.value === 'rejected')
-    : statusActions;
+    ? baseStatusActions.filter((s) => s.value === 'accepted' || s.value === 'rejected')
+    : baseStatusActions;
+
+  // Advanced statuses visible only for accepted candidates (manager/admin only)
+  const canShowAdvanced = !isReviewer && application && 
+    ['accepted', 'in_review', 'screening_test', 'interview'].includes(application.status);
+  const advancedActions = canShowAdvanced ? advancedStatusActions : [];
 
   if (!application) return null;
 
