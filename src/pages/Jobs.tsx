@@ -107,6 +107,16 @@ const Jobs = () => {
 
       {isLoading ? (
         <div className="text-muted-foreground">Ładowanie...</div>
+      ) : isError ? (
+        <div className="text-center py-16 space-y-2">
+          <p className="text-destructive font-medium">Nie udało się pobrać ogłoszeń</p>
+          <p className="text-sm text-muted-foreground">Sprawdź połączenie i odśwież stronę.</p>
+        </div>
+      ) : isReviewer && (!filteredJobs || filteredJobs.length === 0) ? (
+        <div className="text-center text-muted-foreground py-16 space-y-2">
+          <p className="font-medium text-foreground">Brak przypisanych recenzji</p>
+          <p className="text-sm">Nie masz jeszcze przypisanych kandydatur do oceny. Skontaktuj się z administratorem.</p>
+        </div>
       ) : filteredJobs?.length === 0 ? (
         <div className="text-center text-muted-foreground py-16">
           Brak ogłoszeń w tej kategorii. Dodaj pierwsze ogłoszenie.

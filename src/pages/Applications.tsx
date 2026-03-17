@@ -208,6 +208,16 @@ const Applications = () => {
 
       {isLoading ? (
         <div className="text-muted-foreground">Ładowanie...</div>
+      ) : isError ? (
+        <div className="text-center py-16 space-y-2">
+          <p className="text-destructive font-medium">Nie udało się pobrać kandydatur</p>
+          <p className="text-sm text-muted-foreground">Sprawdź połączenie i odśwież stronę.</p>
+        </div>
+      ) : isReviewer && (!applications || applications.length === 0) ? (
+        <div className="text-center py-16 space-y-2">
+          <p className="font-medium text-foreground">Brak przypisanych kandydatur</p>
+          <p className="text-sm text-muted-foreground">Nie masz jeszcze przypisanych kandydatur do oceny w tym ogłoszeniu.</p>
+        </div>
       ) : viewMode === 'kanban' ? (
         <KanbanBoard applications={applications || []} onSelectApp={setSelectedApp} />
       ) : (
