@@ -35,6 +35,7 @@ const statusBadge: Record<string, { label: string; className: string }> = {
   in_review: { label: 'W recenzji', className: 'bg-violet-600 text-white border-violet-600' },
   screening_test: { label: 'Screening test', className: 'bg-indigo-600 text-white border-indigo-600' },
   interview: { label: 'Rozmowa', className: 'bg-cyan-600 text-white border-cyan-600' },
+  offer: { label: 'Oferta', className: 'bg-yellow-500 text-white border-yellow-500' },
 };
 
 const ratingColor = (rating: number | null) => {

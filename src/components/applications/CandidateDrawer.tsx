@@ -135,9 +135,16 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     : baseStatusActions;
 
   // Advanced statuses visible only for accepted candidates (manager/admin only)
+  // Show stage 2 statuses when candidate is accepted or already in stage 2
   const canShowAdvanced = !isReviewer && application && 
     ['accepted', 'in_review', 'screening_test', 'interview'].includes(application.status);
-  const advancedActions = canShowAdvanced ? advancedStatusActions : [];
+  // Filter: offer only visible from interview status
+  const advancedActions = canShowAdvanced
+    ? advancedStatusActions.filter((s) => {
+        if (s.value === 'offer') return application.status === 'interview';
+        return true;
+      })
+    : [];
 
   if (!application) return null;
 
