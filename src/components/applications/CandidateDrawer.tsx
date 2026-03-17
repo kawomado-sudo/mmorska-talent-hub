@@ -120,7 +120,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     statusMutation.mutate(statusValue);
   };
 
-  const filteredTeamMembers = (teamMembers || []).filter((m: any) => m.auth_user_id != null);
+  const filteredTeamMembers = (teamMembers || []).filter((m: any) => m.active);
 
   // Reviewer sees only Accept/Reject buttons
   const visibleActions = isReviewer
