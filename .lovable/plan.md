@@ -1,70 +1,31 @@
-## MMorska — Wewnętrzny Panel Rekrutera
 
-### Przegląd
 
-Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
+## Problem
 
-### Konfiguracja
+Dropdown recenzentów w CandidateDrawer filtruje pracowników po `auth_user_id != null`. Z 6 aktywnych pracowników w `team_members_public` tylko 1 (Dobrochna Mańkowska) ma ustawiony `auth_user_id`, dlatego widzisz tylko siebie.
 
-1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
-2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
-3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
-4. **Font Inter** — import z Google Fonts
+## Rozwiazanie
 
-### Autoryzacja
+Pokazac wszystkich aktywnych pracownikow w dropdown, niezaleznie od `auth_user_id`. Gdy pracownik bez `auth_user_id` zostanie przypisany, użyjemy jego `id` z tabeli `team_members_public`. Gdy ten pracownik zaloguje sie po raz pierwszy (trigger `handle_new_user_azure` ustawi `auth_user_id`), system automatycznie je dopasuje.
 
-- `AuthProvider` context z `onAuthStateChange` + `getSession`
-- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
-- `ProtectedRoute` component — brak sesji → redirect `/login`
-- Przycisk wylogowania w sidebarze
+### Zmiany
 
-### Strona `/login`
+#### 1. `src/components/applications/CandidateDrawer.tsx`
+- Usunac filtr `auth_user_id != null` (linia 123)
+- Uzyc `m.id` jako value w `SelectItem` zamiast `m.auth_user_id`
+- Wyswietlic `full_name (email)` w dropdown
 
-- Wyśrodkowane logo MMorska na ciemnym tle
-- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
-- Brak pól email/hasło
+#### 2. `supabase/functions/hr-api/index.ts` — akcja `assign_reviewer`
+- Zmiana: przyjmowac `reviewer_id` jako ID z `team_members_public` (nie `auth_user_id`)
+- Lookup pracownika po `id` zamiast `auth_user_id`
+- W `applications.assigned_reviewer_id` zapisywac `auth_user_id` jezeli istnieje, a jesli nie — zapisac `team_member_id` i oznaczyc do pozniejszego dopasowania
+- Upsert do `hr_reviewers` po `email` zamiast `auth_user_id`
 
-### Layout z Sidebarem
+#### 3. `supabase/functions/hr-api/index.ts` — akcja `list_applications` (reviewer_only)
+- Rozszerzyc filtr: sprawdzac `assigned_reviewer_id = userId` LUB sprawdzic czy team_member powiazany z `userId` jest przypisany
 
-- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
-- Przycisk "Wyloguj" na dole
-- Kompaktowy, profesjonalny design
+To zapewni ze:
+- Wszyscy aktywni pracownicy sa widoczni w dropdown
+- Przypisanie dziala nawet jesli pracownik jeszcze sie nie zalogowal
+- Recenzent po zalogowaniu zobaczy swoje przypisane kandydatury
 
-### Strona `/jobs` — Ogłoszenia
-
-- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
-- Przycisk "Nowe ogłoszenie" → modal z formularzem
-- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
-- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
-- Liczba kandydatur pobierana z `hr.applications` (count per job)
-
-### Strona `/jobs/:id/applications` — Kandydatury
-
-- Nagłówek z nazwą stanowiska + link powrotny
-- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
-- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
-- Kliknięcie wiersza → drawer boczny
-
-### Drawer kandydata
-
-- Dane kontaktowe: imię, nazwisko, email, telefon
-- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
-- List motywacyjny (przewijany)
-- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
-- Edytowalne pole "Notatki rekrutera" z zapisem inline
-- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
-- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
-- Historia statusów — chronologiczna lista zmian
-
-### Strona `/settings` — Ustawienia formularza
-
-- Formularz z polami z `hr.form_config` (klucz-wartość)
-- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
-- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
-
-### Ważne szczegóły techniczne
-
-- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
-- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
-- Brak jakiegokolwiek email/password auth w kodzie
-- Status change = UPDATE + INSERT log (atomowo)
