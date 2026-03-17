@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileUp, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileUp, Loader2, LayoutList, LayoutGrid } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
+import { KanbanBoard } from '@/components/applications/KanbanBoard';
 import { toast } from 'sonner';
 
 const statusFilters = [
