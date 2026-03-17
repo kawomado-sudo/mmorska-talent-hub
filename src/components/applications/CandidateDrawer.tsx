@@ -31,6 +31,7 @@ const advancedStatusActions = [
   { value: 'in_review', label: 'W recenzji', className: 'bg-violet-600 text-white hover:bg-violet-700 border-violet-600' },
   { value: 'screening_test', label: 'Screening test', className: 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600' },
   { value: 'interview', label: 'Rozmowa', className: 'bg-cyan-600 text-white hover:bg-cyan-700 border-cyan-600' },
+  { value: 'offer', label: 'Oferta', className: 'bg-yellow-500 text-white hover:bg-yellow-600 border-yellow-500' },
 ];
 
 export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawerProps) => {
@@ -134,9 +135,16 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     : baseStatusActions;
 
   // Advanced statuses visible only for accepted candidates (manager/admin only)
+  // Show stage 2 statuses when candidate is accepted or already in stage 2
   const canShowAdvanced = !isReviewer && application && 
     ['accepted', 'in_review', 'screening_test', 'interview'].includes(application.status);
-  const advancedActions = canShowAdvanced ? advancedStatusActions : [];
+  // Filter: offer only visible from interview status
+  const advancedActions = canShowAdvanced
+    ? advancedStatusActions.filter((s) => {
+        if (s.value === 'offer') return application.status === 'interview';
+        return true;
+      })
+    : [];
 
   if (!application) return null;
 
