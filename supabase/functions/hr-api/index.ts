@@ -119,9 +119,21 @@ Deno.serve(async (req) => {
         if (params.status && params.status !== "all") {
           query = query.eq("status", params.status);
         }
-        // If reviewer_only flag is set, filter by assigned_reviewer_id
+        // If reviewer_only flag is set, filter by assigned_reviewer_id (auth_user_id OR team_member_id)
         if (params.reviewer_only) {
-          query = query.eq("assigned_reviewer_id", userId);
+          // First find team_member_id for this user
+          const { data: tm } = await dbPublic
+            .from("team_members_public")
+            .select("id")
+            .eq("auth_user_id", userId)
+            .maybeSingle();
+          
+          if (tm) {
+            // Match either auth_user_id or team_member_id
+            query = query.or(`assigned_reviewer_id.eq.${userId},assigned_reviewer_id.eq.${tm.id}`);
+          } else {
+            query = query.eq("assigned_reviewer_id", userId);
+          }
         }
         const { data, error } = await query;
         if (error) throw error;
@@ -200,7 +212,7 @@ Deno.serve(async (req) => {
       }
 
       case "assign_reviewer": {
-        // params: application_id, reviewer_id (auth_user_id of reviewer)
+        // params: application_id, reviewer_id (id from team_members_public)
         const { application_id, reviewer_id } = params;
 
         // Get current application status
@@ -213,34 +225,49 @@ Deno.serve(async (req) => {
 
         const oldStatus = app.status;
 
-        // Get reviewer info from team_members_public
+        // Get team member info from team_members_public by id
         const { data: member, error: memErr } = await dbPublic
           .from("team_members_public")
-          .select("auth_user_id, full_name, email")
-          .eq("auth_user_id", reviewer_id)
+          .select("id, auth_user_id, full_name, email")
+          .eq("id", reviewer_id)
           .single();
         if (memErr) throw memErr;
 
-        // Auto-add to hr_reviewers if not already there (upsert)
+        // Use auth_user_id if available, otherwise use team_member_id
+        const assigneeId = member.auth_user_id || member.id;
+
+        // Auto-add to hr_reviewers (upsert by email since auth_user_id may be null)
         const { error: upsertErr } = await db
           .from("hr_reviewers")
           .upsert(
             {
-              auth_user_id: member.auth_user_id,
+              auth_user_id: member.auth_user_id || null,
               full_name: member.full_name,
               email: member.email,
               active: true,
             },
-            { onConflict: "auth_user_id" }
+            { onConflict: member.auth_user_id ? "auth_user_id" : "email" }
           );
-        if (upsertErr) throw upsertErr;
+        if (upsertErr) {
+          console.error("hr_reviewers upsert error:", upsertErr);
+          // Try insert if upsert fails
+          const { error: insertErr } = await db
+            .from("hr_reviewers")
+            .insert({
+              auth_user_id: member.auth_user_id || null,
+              full_name: member.full_name,
+              email: member.email,
+              active: true,
+            });
+          if (insertErr) console.error("hr_reviewers insert fallback error:", insertErr);
+        }
 
         // Update application: set status to reviewing + assign reviewer
         const { error: updErr } = await db
           .from("applications")
           .update({
             status: "reviewing",
-            assigned_reviewer_id: reviewer_id,
+            assigned_reviewer_id: assigneeId,
             updated_at: new Date().toISOString(),
           })
           .eq("id", application_id);
@@ -292,7 +319,6 @@ Deno.serve(async (req) => {
             });
           } catch (emailErr) {
             console.error("Failed to send reviewer notification email:", emailErr);
-            // Don't fail the assignment if email fails
           }
         }
 

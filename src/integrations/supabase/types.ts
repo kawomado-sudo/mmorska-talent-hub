@@ -1866,6 +1866,51 @@ export type Database = {
         }
         Relationships: []
       }
+      lov_absence_requests: {
+        Row: {
+          absence_type: Database["public"]["Enums"]["absence_type"] | null
+          created_at: string | null
+          end_date: string | null
+          id: string | null
+          n8n_webhook_sent: boolean | null
+          notes: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          reviewer_note: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["absence_status"] | null
+          user_id: string | null
+        }
+        Insert: {
+          absence_type?: Database["public"]["Enums"]["absence_type"] | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string | null
+          n8n_webhook_sent?: boolean | null
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_note?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["absence_status"] | null
+          user_id?: string | null
+        }
+        Update: {
+          absence_type?: Database["public"]["Enums"]["absence_type"] | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string | null
+          n8n_webhook_sent?: boolean | null
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_note?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["absence_status"] | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       lov_announcements: {
         Row: {
           author_name: string | null
@@ -1923,6 +1968,27 @@ export type Database = {
           name?: string | null
           sort_order?: number | null
           url?: string | null
+        }
+        Relationships: []
+      }
+      lov_team_hierarchy: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          manager_email: string | null
+          member_email: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          manager_email?: string | null
+          member_email?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          manager_email?: string | null
+          member_email?: string | null
         }
         Relationships: []
       }
@@ -2242,6 +2308,14 @@ export type Database = {
           agent_phone: string
         }[]
       }
+      get_my_team_user_ids: {
+        Args: never
+        Returns: {
+          display_name: string
+          email: string
+          user_id: string
+        }[]
+      }
       has_app_access: { Args: { p_app_slug: string }; Returns: boolean }
       has_role:
         | {
@@ -2275,6 +2349,14 @@ export type Database = {
       }
     }
     Enums: {
+      absence_status: "pending" | "approved" | "rejected"
+      absence_type:
+        | "vacation"
+        | "sick_leave"
+        | "delegation"
+        | "home_office"
+        | "occasional_leave"
+        | "training"
       additional_service_enum: "mmsi" | "express_registration"
       agent_order_pdf_status_enum:
         | "not_requested"
@@ -2503,6 +2585,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      absence_status: ["pending", "approved", "rejected"],
+      absence_type: [
+        "vacation",
+        "sick_leave",
+        "delegation",
+        "home_office",
+        "occasional_leave",
+        "training",
+      ],
       additional_service_enum: ["mmsi", "express_registration"],
       agent_order_pdf_status_enum: [
         "not_requested",
