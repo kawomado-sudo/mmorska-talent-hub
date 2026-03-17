@@ -20,6 +20,9 @@ const statusFilters = [
   { value: 'hold', label: 'Hold' },
   { value: 'accepted', label: 'Zaakceptowane' },
   { value: 'rejected', label: 'Odrzucone' },
+  { value: 'in_review', label: 'W recenzji' },
+  { value: 'screening_test', label: 'Screening test' },
+  { value: 'interview', label: 'Rozmowa' },
 ];
 
 const statusBadge: Record<string, { label: string; className: string }> = {
@@ -28,6 +31,9 @@ const statusBadge: Record<string, { label: string; className: string }> = {
   hold: { label: 'Hold', className: 'bg-amber-500 text-white border-amber-500' },
   accepted: { label: 'Zaakceptowane', className: 'bg-emerald-600 text-white border-emerald-600' },
   rejected: { label: 'Odrzucone', className: 'bg-red-600 text-white border-red-600' },
+  in_review: { label: 'W recenzji', className: 'bg-violet-600 text-white border-violet-600' },
+  screening_test: { label: 'Screening test', className: 'bg-indigo-600 text-white border-indigo-600' },
+  interview: { label: 'Rozmowa', className: 'bg-cyan-600 text-white border-cyan-600' },
 };
 
 const ratingColor = (rating: number | null) => {
