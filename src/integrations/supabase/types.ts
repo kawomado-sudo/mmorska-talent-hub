@@ -1971,6 +1971,63 @@ export type Database = {
         }
         Relationships: []
       }
+      lov_employee_leave_assignments: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          notes: string | null
+          overrides: Json | null
+          package_id: string | null
+          user_email: string | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          notes?: string | null
+          overrides?: Json | null
+          package_id?: string | null
+          user_email?: string | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          notes?: string | null
+          overrides?: Json | null
+          package_id?: string | null
+          user_email?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
+      lov_leave_packages: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          is_active: boolean | null
+          limits: Json | null
+          name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          limits?: Json | null
+          name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          limits?: Json | null
+          name?: string | null
+        }
+        Relationships: []
+      }
       lov_team_hierarchy: {
         Row: {
           created_at: string | null
@@ -2318,6 +2375,7 @@ export type Database = {
           agent_phone: string
         }[]
       }
+      get_my_leave_balance: { Args: { p_year?: number }; Returns: Json }
       get_my_team_user_ids: {
         Args: never
         Returns: {
@@ -2367,6 +2425,13 @@ export type Database = {
         | "home_office"
         | "occasional_leave"
         | "training"
+        | "on_demand"
+        | "force_majeure"
+        | "maternity"
+        | "parental"
+        | "paternity"
+        | "childcare"
+        | "unpaid"
       additional_service_enum: "mmsi" | "express_registration"
       agent_order_pdf_status_enum:
         | "not_requested"
@@ -2603,6 +2668,13 @@ export const Constants = {
         "home_office",
         "occasional_leave",
         "training",
+        "on_demand",
+        "force_majeure",
+        "maternity",
+        "parental",
+        "paternity",
+        "childcare",
+        "unpaid",
       ],
       additional_service_enum: ["mmsi", "express_registration"],
       agent_order_pdf_status_enum: [
