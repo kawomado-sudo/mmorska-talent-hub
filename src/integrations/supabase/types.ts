@@ -2432,6 +2432,10 @@ export type Database = {
         | "paternity"
         | "childcare"
         | "unpaid"
+        | "care_leave"
+        | "compassionate"
+        | "blood_donation"
+        | "other_legal"
       additional_service_enum: "mmsi" | "express_registration"
       agent_order_pdf_status_enum:
         | "not_requested"
@@ -2675,6 +2679,10 @@ export const Constants = {
         "paternity",
         "childcare",
         "unpaid",
+        "care_leave",
+        "compassionate",
+        "blood_donation",
+        "other_legal",
       ],
       additional_service_enum: ["mmsi", "express_registration"],
       agent_order_pdf_status_enum: [
