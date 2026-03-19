@@ -158,6 +158,12 @@ const Jobs = () => {
                     {job.description}
                   </p>
                 )}
+                {job.reviewers && job.reviewers.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <UserCheck className="h-3.5 w-3.5 text-primary" />
+                    <span className="truncate">{job.reviewers.join(', ')}</span>
+                  </div>
+                )}
               </CardContent>
               {isAdmin && (
                 <CardFooter className="pt-0">
