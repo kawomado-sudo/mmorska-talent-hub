@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseHr } from '@/integrations/supabase/hrClient';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -118,14 +118,14 @@ export default function Screening() {
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['screening_templates'],
     queryFn: async () => {
-      const { data: tpls, error } = await supabaseHr
+      const { data: tpls, error } = await supabase
         .from('screening_templates')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
 
       // Count questions per template
-      const { data: qCounts } = await supabaseHr
+      const { data: qCounts } = await supabase
         .from('screening_questions')
         .select('template_id');
 
@@ -145,7 +145,7 @@ export default function Screening() {
   const { data: skills = [] } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('skills')
         .select('id, category_id, name')
         .order('name');
@@ -157,7 +157,7 @@ export default function Screening() {
   const { data: categories = [] } = useQuery({
     queryKey: ['skill_categories'],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('skill_categories')
         .select('id, name, color')
         .order('name');
@@ -168,7 +168,7 @@ export default function Screening() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabaseHr.from('screening_templates').delete().eq('id', id);
+      const { error } = await supabase.from('screening_templates').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -194,7 +194,7 @@ export default function Screening() {
     setTplIsGlobal(tpl.is_global);
 
     // Load existing questions
-    const { data, error } = await supabaseHr
+    const { data, error } = await supabase
       .from('screening_questions')
       .select('*')
       .eq('template_id', tpl.id)
@@ -233,7 +233,7 @@ export default function Screening() {
       let templateId: string;
 
       if (editingTemplate) {
-        const { error } = await supabaseHr
+        const { error } = await supabase
           .from('screening_templates')
           .update({
             name: tplName.trim(),
@@ -245,12 +245,12 @@ export default function Screening() {
         templateId = editingTemplate.id;
 
         // Delete all existing questions and re-insert
-        await supabaseHr
+        await supabase
           .from('screening_questions')
           .delete()
           .eq('template_id', templateId);
       } else {
-        const { data, error } = await supabaseHr
+        const { data, error } = await supabase
           .from('screening_templates')
           .insert({
             name: tplName.trim(),
@@ -281,7 +281,7 @@ export default function Screening() {
           order_index: idx,
         }));
 
-        const { error: qError } = await supabaseHr
+        const { error: qError } = await supabase
           .from('screening_questions')
           .insert(rows);
         if (qError) throw qError;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseHr } from '@/integrations/supabase/hrClient';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -58,7 +58,7 @@ export default function Skills() {
   const { data: categories = [], isLoading: catsLoading } = useQuery({
     queryKey: ['skill_categories'],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('skill_categories')
         .select('*')
         .order('name');
@@ -71,7 +71,7 @@ export default function Skills() {
   const { data: skills = [], isLoading: skillsLoading } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('skills')
         .select('*')
         .order('name');
@@ -84,13 +84,13 @@ export default function Skills() {
   const saveCatMutation = useMutation({
     mutationFn: async ({ name, color }: { name: string; color: string }) => {
       if (editingCat) {
-        const { error } = await supabaseHr
+        const { error } = await supabase
           .from('skill_categories')
           .update({ name, color })
           .eq('id', editingCat.id);
         if (error) throw error;
       } else {
-        const { error } = await supabaseHr
+        const { error } = await supabase
           .from('skill_categories')
           .insert({ name, color });
         if (error) throw error;
@@ -106,7 +106,7 @@ export default function Skills() {
 
   const deleteCatMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabaseHr.from('skill_categories').delete().eq('id', id);
+      const { error } = await supabase.from('skill_categories').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -129,13 +129,13 @@ export default function Skills() {
       category_id: string;
     }) => {
       if (editingSkill) {
-        const { error } = await supabaseHr
+        const { error } = await supabase
           .from('skills')
           .update({ name, description: description || null, category_id })
           .eq('id', editingSkill.id);
         if (error) throw error;
       } else {
-        const { error } = await supabaseHr
+        const { error } = await supabase
           .from('skills')
           .insert({ name, description: description || null, category_id });
         if (error) throw error;
@@ -151,7 +151,7 @@ export default function Skills() {
 
   const deleteSkillMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabaseHr.from('skills').delete().eq('id', id);
+      const { error } = await supabase.from('skills').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {

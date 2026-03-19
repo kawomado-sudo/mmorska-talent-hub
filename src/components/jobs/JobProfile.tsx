@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseHr } from '@/integrations/supabase/hrClient';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -81,7 +81,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
   const { data: skills = [] } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('skills')
         .select('id, category_id, name')
         .order('name');
@@ -93,7 +93,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
   const { data: categories = [] } = useQuery({
     queryKey: ['skill_categories'],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('skill_categories')
         .select('id, name, color')
         .order('name');
@@ -106,7 +106,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
   const { data: jobSkills = [], isLoading } = useQuery({
     queryKey: ['job_skills', jobId],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('job_skills')
         .select('*')
         .eq('job_id', jobId);
@@ -120,7 +120,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
   const { data: templates = [] } = useQuery({
     queryKey: ['screening_templates_for_job', jobId],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('screening_templates')
         .select('id, name, is_global, job_id')
         .or(`is_global.eq.true,job_id.eq.${jobId}`)
@@ -143,7 +143,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
       skill_id: string;
       moscow: Moscow;
     }) => {
-      const { error } = await supabaseHr.from('job_skills').insert({
+      const { error } = await supabase.from('job_skills').insert({
         job_id: jobId,
         skill_id,
         moscow,
@@ -162,7 +162,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
   // Update moscow mutation
   const updateMoscowMutation = useMutation({
     mutationFn: async ({ id, moscow }: { id: string; moscow: Moscow }) => {
-      const { error } = await supabaseHr
+      const { error } = await supabase
         .from('job_skills')
         .update({ moscow })
         .eq('id', id);
@@ -177,7 +177,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
   // Remove skill mutation
   const removeSkillMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabaseHr.from('job_skills').delete().eq('id', id);
+      const { error } = await supabase.from('job_skills').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -191,7 +191,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
   const assignTemplateMutation = useMutation({
     mutationFn: async (templateId: string) => {
       // Get template details
-      const { data: tpl, error: tplErr } = await supabaseHr
+      const { data: tpl, error: tplErr } = await supabase
         .from('screening_templates')
         .select('*')
         .eq('id', templateId)
@@ -204,7 +204,7 @@ export function JobProfile({ jobId }: JobProfileProps) {
         // Actually job_id on screening_templates means "template for this job".
         // We just update an existing per-job template or create a new assignment.
         // Simpler: update the template's job_id field.
-        const { error } = await supabaseHr
+        const { error } = await supabase
           .from('screening_templates')
           .update({ job_id: jobId })
           .eq('id', templateId);

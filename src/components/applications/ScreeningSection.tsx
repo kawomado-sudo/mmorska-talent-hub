@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseHr } from '@/integrations/supabase/hrClient';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -104,7 +104,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
   const { data: invitation, isLoading: invLoading } = useQuery({
     queryKey: ['screening_invitation', applicationId],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('screening_invitations')
         .select('*')
         .eq('application_id', applicationId)
@@ -119,7 +119,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
   const { data: templates = [] } = useQuery({
     queryKey: ['screening_templates_for_job', jobId],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('screening_templates')
         .select('id, name, is_global, job_id')
         .or(`is_global.eq.true,job_id.eq.${jobId}`)
@@ -134,7 +134,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
   const { data: responses = [] } = useQuery({
     queryKey: ['screening_responses', invitation?.id],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('screening_responses')
         .select('*')
         .eq('invitation_id', invitation!.id);
@@ -148,7 +148,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
   const { data: questions = [] } = useQuery({
     queryKey: ['screening_questions', invitation?.template_id],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('screening_questions')
         .select('*')
         .eq('template_id', invitation!.template_id)
@@ -163,7 +163,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
   const { data: analysis } = useQuery({
     queryKey: ['screening_ai_analysis', invitation?.id],
     queryFn: async () => {
-      const { data, error } = await supabaseHr
+      const { data, error } = await supabase
         .from('screening_ai_analysis')
         .select('*')
         .eq('invitation_id', invitation!.id)
@@ -182,7 +182,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
-      const { error } = await supabaseHr.from('screening_invitations').insert({
+      const { error } = await supabase.from('screening_invitations').insert({
         application_id: applicationId,
         template_id: selectedTemplateId,
         status: 'pending',
@@ -208,7 +208,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
       notes?: string;
     }) => {
       if (!analysis) return;
-      const { error } = await supabaseHr
+      const { error } = await supabase
         .from('screening_ai_analysis')
         .update({
           status,
