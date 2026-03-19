@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sparkles, Download, ExternalLink, Save, Eye, UserCheck } from 'lucide-react';
+import { Sparkles, Download, ExternalLink, Save, Eye, UserCheck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CandidateDrawerProps {

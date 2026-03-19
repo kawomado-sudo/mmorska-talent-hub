@@ -146,14 +146,54 @@ ai_rating powinien uwzględniać: dopasowanie umiejętności, doświadczenie, wy
       });
     }
 
-    // 5. Insert application record (store storage path, not public URL)
+    // 5. Check for duplicates (same email or name for same job)
+    const candidateEmail = parsed.email || null;
+    const candidateFirst = parsed.first_name || "Nieznany";
+    const candidateLast = parsed.last_name || "";
+
+    if (candidateEmail) {
+      const { data: existingByEmail } = await supabase
+        .from("applications")
+        .select("id")
+        .eq("job_id", job_id)
+        .eq("email", candidateEmail)
+        .maybeSingle();
+
+      if (existingByEmail) {
+        // Clean up uploaded CV since we won't use it
+        await supabaseStorage.storage.from("hr-cv").remove([cv_storage_path]);
+        return new Response(
+          JSON.stringify({ error: "Kandydat z tym adresem email już aplikował na to stanowisko." }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      // No email — check by first_name + last_name
+      const { data: existingByName } = await supabase
+        .from("applications")
+        .select("id")
+        .eq("job_id", job_id)
+        .eq("first_name", candidateFirst)
+        .eq("last_name", candidateLast)
+        .maybeSingle();
+
+      if (existingByName) {
+        await supabaseStorage.storage.from("hr-cv").remove([cv_storage_path]);
+        return new Response(
+          JSON.stringify({ error: "Kandydat o tym imieniu i nazwisku już aplikował na to stanowisko." }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // 6. Insert application record (store storage path, not public URL)
     const { data: appData, error: appError } = await supabase
       .from("applications")
       .insert({
         job_id,
-        first_name: parsed.first_name || "Nieznany",
-        last_name: parsed.last_name || "",
-        email: parsed.email || null,
+        first_name: candidateFirst,
+        last_name: candidateLast,
+        email: candidateEmail,
         phone: parsed.phone || null,
         ai_summary: parsed.ai_summary || null,
         ai_rating: Math.min(100, Math.max(0, parseInt(parsed.ai_rating) || 0)),

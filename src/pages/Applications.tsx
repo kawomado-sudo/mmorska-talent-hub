@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { hrApi } from '@/lib/hr-api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, FileUp, Loader2, LayoutList, LayoutGrid } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, FileUp, Loader2, LayoutList, LayoutGrid, Trash2 } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
 import { KanbanBoard } from '@/components/applications/KanbanBoard';
 import { toast } from 'sonner';
@@ -55,12 +56,13 @@ const Applications = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isReviewer } = useAuth();
+  const { isReviewer, isAdmin } = useAuth();
   const [filter, setFilter] = useState('all');
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
   const { data: job } = useQuery({
     queryKey: ['job', jobId],
@@ -74,6 +76,18 @@ const Applications = () => {
       status: viewMode === 'kanban' ? 'all' : filter,
       reviewer_only: isReviewer,
     }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (applicationId: string) => hrApi('delete_application', { application_id: applicationId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
+      toast.success('Kandydatura została trwale usunięta');
+      setDeleteTarget(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Nie udało się usunąć kandydatury');
+    },
   });
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -148,7 +162,6 @@ const Applications = () => {
         )}
       </div>
 
-      {/* Ukryj upload CV dla recenzenta */}
       {!isReviewer && (
         <div
           className={`mb-6 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
@@ -238,6 +251,7 @@ const Applications = () => {
                 <TableHead>Recenzent</TableHead>
                 <TableHead>Dopasowanie AI</TableHead>
                 <TableHead>AI Summary</TableHead>
+                {isAdmin && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -279,11 +293,26 @@ const Applications = () => {
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">
                     {app.ai_summary ? app.ai_summary.substring(0, 80) + (app.ai_summary.length > 80 ? '…' : '') : '—'}
                   </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(app);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {applications?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-muted-foreground">
                     {isReviewer ? 'Brak przypisanych kandydatur do oceny.' : 'Brak kandydatur. Prześlij CV aby dodać kandydata.'}
                   </TableCell>
                 </TableRow>
@@ -297,7 +326,34 @@ const Applications = () => {
         application={selectedApp}
         onClose={() => setSelectedApp(null)}
         jobId={jobId!}
+        onDelete={isAdmin ? (app: any) => setDeleteTarget(app) : undefined}
       />
+
+      {/* RODO Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Usunąć kandydaturę?</DialogTitle>
+            <DialogDescription>
+              Dane kandydata <strong>{deleteTarget?.first_name} {deleteTarget?.last_name}</strong> zostaną
+              trwale usunięte wraz z plikiem CV, zgodnie z wymogami RODO.
+              Tej operacji nie można cofnąć.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Anuluj
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Usuwanie...' : 'Usuń trwale'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
