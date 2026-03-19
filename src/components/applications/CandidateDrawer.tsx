@@ -97,6 +97,23 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
     onError: () => toast.error('Nie udało się zmienić statusu'),
   });
 
+  const submitReviewMutation = useMutation({
+    mutationFn: async (decision: 'accepted' | 'rejected') => {
+      await hrApi('submit_review', {
+        application_id: application.id,
+        status: decision,
+        notes: reviewNotes,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['status-history', application?.id] });
+      toast.success('Recenzja zapisana i wysłana');
+      onClose();
+    },
+    onError: () => toast.error('Nie udało się zapisać recenzji'),
+  });
+
   const assignReviewerMutation = useMutation({
     mutationFn: async () => {
       await hrApi('assign_reviewer', {
