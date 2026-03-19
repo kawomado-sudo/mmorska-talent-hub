@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Briefcase, Settings, LogOut } from 'lucide-react';
+import { Briefcase, Settings, LogOut, Sparkles, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const AppLayout = () => {
@@ -8,6 +8,8 @@ export const AppLayout = () => {
 
   const navItems = [
     { to: '/jobs', label: 'Ogłoszenia', icon: Briefcase, visible: true },
+    { to: '/skills', label: 'Skille', icon: Sparkles, visible: isAdmin },
+    { to: '/screening', label: 'Testy', icon: ClipboardList, visible: isAdmin },
     { to: '/settings', label: 'Ustawienia', icon: Settings, visible: isAdmin },
   ].filter((item) => item.visible);
 

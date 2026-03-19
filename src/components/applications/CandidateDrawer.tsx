@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sparkles, Download, ExternalLink, Save, Eye, UserCheck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ScreeningSection } from './ScreeningSection';
 
 interface CandidateDrawerProps {
   application: any;
@@ -241,6 +242,14 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
               {application.ai_summary || 'Podsumowanie AI w trakcie generowania…'}
             </p>
           </div>
+
+          {/* Screening section — shown when status is screening_test */}
+          {application.status === 'screening_test' && !isReviewer && (
+            <>
+              <Separator />
+              <ScreeningSection applicationId={application.id} jobId={jobId} />
+            </>
+          )}
 
           <Separator />
 
