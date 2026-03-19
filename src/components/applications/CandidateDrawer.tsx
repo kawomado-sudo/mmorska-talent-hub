@@ -192,6 +192,14 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
             {application.phone && <div><span className="text-muted-foreground">Telefon:</span> {application.phone}</div>}
           </div>
 
+          {cvLoading && (
+            <p className="text-sm text-muted-foreground">Ładowanie CV…</p>
+          )}
+
+          {cvError && !cvSignedUrl && (
+            <p className="text-sm text-destructive">Nie udało się załadować podglądu CV.</p>
+          )}
+
           {cvSignedUrl && (
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowCvPreview(true)} className="gap-2">
