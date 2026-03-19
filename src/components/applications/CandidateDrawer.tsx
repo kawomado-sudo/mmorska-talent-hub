@@ -40,6 +40,8 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
   const [notes, setNotes] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
+  const [cvLoading, setCvLoading] = useState(false);
+  const [cvError, setCvError] = useState(false);
   const [showCvPreview, setShowCvPreview] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>('');
 
@@ -48,12 +50,21 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
       setNotes(application.recruiter_notes || '');
       setReviewNotes('');
       setCvSignedUrl(null);
+      setCvError(false);
       setSelectedReviewerId('');
       const cvPath = application.cv_url;
       if (cvPath && !cvPath.startsWith('http')) {
-        supabase.storage.from('hr-cv').createSignedUrl(cvPath, 3600).then(({ data }) => {
-          if (data?.signedUrl) setCvSignedUrl(data.signedUrl);
-        });
+        setCvLoading(true);
+        hrApi<{ signed_url: string }>('get_cv_signed_url', { application_id: application.id })
+          .then((res) => {
+            setCvSignedUrl(res.signed_url);
+          })
+          .catch((err) => {
+            console.error('CV signed URL error:', err);
+            setCvError(true);
+            toast.error('Nie udało się załadować CV');
+          })
+          .finally(() => setCvLoading(false));
       } else if (cvPath) {
         setCvSignedUrl(cvPath);
       }

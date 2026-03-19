@@ -527,6 +527,34 @@ Deno.serve(async (req) => {
         return json(data);
       }
 
+      // ─── CV SIGNED URL ─────────────────────────────────
+      case "get_cv_signed_url": {
+        const appId = params.application_id;
+        if (!appId) return json({ error: "Missing application_id" }, 400);
+
+        const { data: appData, error: appErr } = await db
+          .from("applications")
+          .select("cv_url")
+          .eq("id", appId)
+          .single();
+        if (appErr || !appData) return json({ error: "Application not found" }, 404);
+        if (!appData.cv_url) return json({ error: "No CV file" }, 404);
+
+        const storageClient = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        );
+        const { data: signedData, error: signErr } = await storageClient.storage
+          .from("hr-cv")
+          .createSignedUrl(appData.cv_url, 3600);
+        if (signErr || !signedData?.signedUrl) {
+          console.error("Signed URL error:", signErr);
+          return json({ error: "Failed to generate signed URL" }, 500);
+        }
+
+        return json({ signed_url: signedData.signedUrl });
+      }
+
       // ─── DELETE APPLICATION (RODO) ──────────────────────
       case "delete_application": {
         // Check admin access
