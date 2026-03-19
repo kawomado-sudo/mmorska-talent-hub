@@ -35,7 +35,7 @@ const advancedStatusActions = [
   { value: 'offer', label: 'Oferta', className: 'bg-yellow-500 text-white hover:bg-yellow-600 border-yellow-500' },
 ];
 
-export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawerProps) => {
+export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: CandidateDrawerProps) => {
   const { user, isReviewer, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
