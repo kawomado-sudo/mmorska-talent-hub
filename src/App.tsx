@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import Jobs from "./pages/Jobs";
 import Applications from "./pages/Applications";
 import SettingsPage from "./pages/SettingsPage";
+import Skills from "./pages/Skills";
+import Screening from "./pages/Screening";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,8 @@ const App = () => (
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/jobs/:jobId/applications" element={<Applications />} />
+              <Route path="/skills" element={<Skills />} />
+              <Route path="/screening" element={<Screening />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />

@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ArrowLeft, FileUp, Loader2, LayoutList, LayoutGrid, Trash2 } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
 import { KanbanBoard } from '@/components/applications/KanbanBoard';
+import { JobProfile } from '@/components/jobs/JobProfile';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
 const getInitials = (name: string) => {
@@ -161,6 +163,20 @@ const Applications = () => {
           </p>
         )}
       </div>
+
+      <Tabs defaultValue="applications">
+        <TabsList className="mb-6">
+          <TabsTrigger value="applications">Kandydatury</TabsTrigger>
+          {!isReviewer && (
+            <TabsTrigger value="profile">Profil stanowiska</TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="profile">
+          <JobProfile jobId={jobId!} />
+        </TabsContent>
+
+        <TabsContent value="applications">
 
       {!isReviewer && (
         <div
@@ -321,6 +337,9 @@ const Applications = () => {
           </Table>
         </div>
       )}
+
+        </TabsContent>
+      </Tabs>
 
       <CandidateDrawer
         application={selectedApp}
