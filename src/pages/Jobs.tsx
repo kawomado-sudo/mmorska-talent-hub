@@ -5,7 +5,7 @@ import { hrApi } from '@/lib/hr-api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Pencil, Trash2, Users, Calendar, Briefcase } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Calendar, Briefcase, UserCheck } from 'lucide-react';
 import { JobFormDialog } from '@/components/jobs/JobFormDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ interface Job {
   published_at: string | null;
   closed_at: string | null;
   application_count?: number;
+  reviewers?: string[];
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -156,6 +157,12 @@ const Jobs = () => {
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {job.description}
                   </p>
+                )}
+                {job.reviewers && job.reviewers.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <UserCheck className="h-3.5 w-3.5 text-primary" />
+                    <span className="truncate">{job.reviewers.join(', ')}</span>
+                  </div>
                 )}
               </CardContent>
               {isAdmin && (

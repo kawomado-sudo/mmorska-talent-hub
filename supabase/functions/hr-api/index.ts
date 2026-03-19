@@ -66,16 +66,47 @@ Deno.serve(async (req) => {
 
         const { data: apps, error: appErr } = await db
           .from("applications")
-          .select("job_id");
+          .select("job_id, assigned_reviewer_id");
         if (appErr) throw appErr;
 
+        // Count applications per job
         const countMap: Record<string, number> = {};
+        // Collect unique reviewer IDs per job
+        const reviewerIdsPerJob: Record<string, Set<string>> = {};
         apps?.forEach((a: any) => {
           countMap[a.job_id] = (countMap[a.job_id] || 0) + 1;
+          if (a.assigned_reviewer_id) {
+            if (!reviewerIdsPerJob[a.job_id]) reviewerIdsPerJob[a.job_id] = new Set();
+            reviewerIdsPerJob[a.job_id].add(a.assigned_reviewer_id);
+          }
         });
 
+        // Collect all unique reviewer IDs across all jobs
+        const allReviewerIds = new Set<string>();
+        Object.values(reviewerIdsPerJob).forEach(s => s.forEach(id => allReviewerIds.add(id)));
+
+        // Fetch reviewer names from team_members_public
+        let reviewerNameMap: Record<string, string> = {};
+        if (allReviewerIds.size > 0) {
+          const ids = Array.from(allReviewerIds);
+          // Try matching by id or auth_user_id
+          const { data: members } = await dbPublic
+            .from("team_members_public")
+            .select("id, auth_user_id, full_name, first_name, last_name")
+            .or(ids.map(id => `id.eq.${id}`).concat(ids.map(id => `auth_user_id.eq.${id}`)).join(","));
+          members?.forEach((m: any) => {
+            const name = m.full_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || "?";
+            if (m.id) reviewerNameMap[m.id] = name;
+            if (m.auth_user_id) reviewerNameMap[m.auth_user_id] = name;
+          });
+        }
+
         return json(
-          jobs.map((j: any) => ({ ...j, application_count: countMap[j.id] || 0 }))
+          jobs.map((j: any) => {
+            const reviewerIds = reviewerIdsPerJob[j.id] ? Array.from(reviewerIdsPerJob[j.id]) : [];
+            const reviewers = [...new Set(reviewerIds.map((id: string) => reviewerNameMap[id]).filter(Boolean))];
+            return { ...j, application_count: countMap[j.id] || 0, reviewers };
+          })
         );
       }
 

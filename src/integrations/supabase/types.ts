@@ -485,7 +485,7 @@ export type Database = {
         }
         Relationships: []
       }
-      B2Bapp_incoming_orders_queue: {
+      B2Bapp_incoming_orders_queue_backup: {
         Row: {
           added_time: string | null
           additional_services:
@@ -495,7 +495,7 @@ export type Database = {
           address_city: string | null
           address_street: string | null
           address_zip: string | null
-          agent_email: string
+          agent_email: string | null
           assigned_to: string | null
           bandera: string | null
           boat_hin: string | null
@@ -505,7 +505,7 @@ export type Database = {
           boatname: string | null
           category: string | null
           city: string | null
-          created_at: string
+          created_at: string | null
           currency: string | null
           customer_company: string | null
           customer_email: string | null
@@ -519,7 +519,7 @@ export type Database = {
           hin_ini: string | null
           homeport: Database["public"]["Enums"]["b2b_homeport_enum"] | null
           hull_1: string | null
-          id: number
+          id: number | null
           imie: string | null
           infinity_item_id: string | null
           kw_engine: string | null
@@ -553,7 +553,7 @@ export type Database = {
           shipping_status: string | null
           shipyard: Database["public"]["Enums"]["b2b_producer_enum"] | null
           street: string | null
-          submission_id: string
+          submission_id: string | null
           telefon: string | null
           total_amount: number | null
           updated_at: string | null
@@ -575,7 +575,7 @@ export type Database = {
           address_city?: string | null
           address_street?: string | null
           address_zip?: string | null
-          agent_email: string
+          agent_email?: string | null
           assigned_to?: string | null
           bandera?: string | null
           boat_hin?: string | null
@@ -585,7 +585,7 @@ export type Database = {
           boatname?: string | null
           category?: string | null
           city?: string | null
-          created_at?: string
+          created_at?: string | null
           currency?: string | null
           customer_company?: string | null
           customer_email?: string | null
@@ -599,7 +599,7 @@ export type Database = {
           hin_ini?: string | null
           homeport?: Database["public"]["Enums"]["b2b_homeport_enum"] | null
           hull_1?: string | null
-          id: number
+          id?: number | null
           imie?: string | null
           infinity_item_id?: string | null
           kw_engine?: string | null
@@ -635,7 +635,7 @@ export type Database = {
           shipping_status?: string | null
           shipyard?: Database["public"]["Enums"]["b2b_producer_enum"] | null
           street?: string | null
-          submission_id: string
+          submission_id?: string | null
           telefon?: string | null
           total_amount?: number | null
           updated_at?: string | null
@@ -657,7 +657,7 @@ export type Database = {
           address_city?: string | null
           address_street?: string | null
           address_zip?: string | null
-          agent_email?: string
+          agent_email?: string | null
           assigned_to?: string | null
           bandera?: string | null
           boat_hin?: string | null
@@ -667,7 +667,7 @@ export type Database = {
           boatname?: string | null
           category?: string | null
           city?: string | null
-          created_at?: string
+          created_at?: string | null
           currency?: string | null
           customer_company?: string | null
           customer_email?: string | null
@@ -681,7 +681,7 @@ export type Database = {
           hin_ini?: string | null
           homeport?: Database["public"]["Enums"]["b2b_homeport_enum"] | null
           hull_1?: string | null
-          id?: number
+          id?: number | null
           imie?: string | null
           infinity_item_id?: string | null
           kw_engine?: string | null
@@ -717,7 +717,7 @@ export type Database = {
           shipping_status?: string | null
           shipyard?: Database["public"]["Enums"]["b2b_producer_enum"] | null
           street?: string | null
-          submission_id?: string
+          submission_id?: string | null
           telefon?: string | null
           total_amount?: number | null
           updated_at?: string | null
