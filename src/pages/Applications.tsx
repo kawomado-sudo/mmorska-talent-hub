@@ -8,10 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ArrowLeft, FileUp, Loader2, LayoutList, LayoutGrid } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
 import { KanbanBoard } from '@/components/applications/KanbanBoard';
 import { toast } from 'sonner';
+
+const getInitials = (name: string) => {
+  if (!name) return '?';
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+};
 
 const statusFilters = [
   { value: 'all', label: 'Wszystkie' },
@@ -229,6 +235,7 @@ const Applications = () => {
                 <TableHead>Email</TableHead>
                 <TableHead>Data aplikacji</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Recenzent</TableHead>
                 <TableHead>Dopasowanie AI</TableHead>
                 <TableHead>AI Summary</TableHead>
               </TableRow>
@@ -243,6 +250,19 @@ const Applications = () => {
                     <Badge className={statusBadge[app.status]?.className}>
                       {statusBadge[app.status]?.label || app.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {app.reviewer_name ? (
+                      <div className="flex items-center gap-2" title={app.reviewer_name}>
+                        <Avatar className="h-7 w-7">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                            {getInitials(app.reviewer_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {app.ai_rating != null ? (
@@ -263,7 +283,7 @@ const Applications = () => {
               ))}
               {applications?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     {isReviewer ? 'Brak przypisanych kandydatur do oceny.' : 'Brak kandydatur. Prześlij CV aby dodać kandydata.'}
                   </TableCell>
                 </TableRow>
