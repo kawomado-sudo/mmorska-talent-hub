@@ -11,13 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sparkles, Download, ExternalLink, Save, Eye, UserCheck } from 'lucide-react';
+import { Sparkles, Download, ExternalLink, Save, Eye, UserCheck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CandidateDrawerProps {
   application: any;
   onClose: () => void;
   jobId: string;
+  onDelete?: (app: any) => void;
 }
 
 const baseStatusActions = [
@@ -34,7 +35,7 @@ const advancedStatusActions = [
   { value: 'offer', label: 'Oferta', className: 'bg-yellow-500 text-white hover:bg-yellow-600 border-yellow-500' },
 ];
 
-export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawerProps) => {
+export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: CandidateDrawerProps) => {
   const { user, isReviewer, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
@@ -359,6 +360,24 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* RODO Delete button — admin only */}
+          {onDelete && (
+            <div className="pt-2">
+              <Separator />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-3 w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  onDelete(application);
+                  onClose();
+                }}
+              >
+                <Trash2 className="h-4 w-4" /> Usuń kandydaturę (RODO)
+              </Button>
             </div>
           )}
         </div>

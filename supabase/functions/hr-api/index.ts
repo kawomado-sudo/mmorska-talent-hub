@@ -527,6 +527,49 @@ Deno.serve(async (req) => {
         return json(data);
       }
 
+      // ─── DELETE APPLICATION (RODO) ──────────────────────
+      case "delete_application": {
+        // Check admin access
+        const { data: callerTm } = await dbPublic
+          .from("team_members_public")
+          .select("email")
+          .eq("auth_user_id", userId)
+          .maybeSingle();
+        const callerEmail = callerTm?.email || '';
+        if (!ADMIN_EMAILS.includes(callerEmail.toLowerCase())) {
+          return json({ error: "Tylko administrator może usuwać kandydatury." }, 403);
+        }
+
+        const appId = params.application_id;
+        if (!appId) return json({ error: "Missing application_id" }, 400);
+
+        // Get application to find CV path
+        const { data: appToDelete, error: getErr } = await db
+          .from("applications")
+          .select("id, cv_url")
+          .eq("id", appId)
+          .single();
+        if (getErr || !appToDelete) return json({ error: "Application not found" }, 404);
+
+        // 1. Delete status logs
+        await db.from("application_status_log").delete().eq("application_id", appId);
+
+        // 2. Delete application record
+        const { error: delErr } = await db.from("applications").delete().eq("id", appId);
+        if (delErr) throw delErr;
+
+        // 3. Delete CV file from storage
+        if (appToDelete.cv_url) {
+          const dbStorage = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+          );
+          await dbStorage.storage.from("hr-cv").remove([appToDelete.cv_url]);
+        }
+
+        return json({ ok: true });
+      }
+
       default:
         return json({ error: `Unknown action: ${action}` }, 400);
     }
