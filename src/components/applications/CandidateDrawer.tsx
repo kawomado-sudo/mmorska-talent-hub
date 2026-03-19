@@ -362,6 +362,24 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
               </div>
             </div>
           )}
+
+          {/* RODO Delete button — admin only */}
+          {onDelete && (
+            <div className="pt-2">
+              <Separator />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-3 w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  onDelete(application);
+                  onClose();
+                }}
+              >
+                <Trash2 className="h-4 w-4" /> Usuń kandydaturę (RODO)
+              </Button>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
