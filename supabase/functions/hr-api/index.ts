@@ -6,6 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const ADMIN_EMAILS = ['support@mmorska.pl', 'dobrochna.mankowska@mmorska.pl'];
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -18,7 +20,6 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth check
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return json({ error: "Unauthorized" }, 401);
@@ -37,14 +38,12 @@ Deno.serve(async (req) => {
   }
   const userId = claimsData.claims.sub;
 
-  // Service role client for hr schema
   const db = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { db: { schema: "hr" } }
   );
 
-  // Public schema client (for team_members_public)
   const dbPublic = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -69,9 +68,7 @@ Deno.serve(async (req) => {
           .select("job_id, assigned_reviewer_id");
         if (appErr) throw appErr;
 
-        // Count applications per job
         const countMap: Record<string, number> = {};
-        // Collect unique reviewer IDs per job
         const reviewerIdsPerJob: Record<string, Set<string>> = {};
         apps?.forEach((a: any) => {
           countMap[a.job_id] = (countMap[a.job_id] || 0) + 1;
@@ -81,15 +78,12 @@ Deno.serve(async (req) => {
           }
         });
 
-        // Collect all unique reviewer IDs across all jobs
         const allReviewerIds = new Set<string>();
         Object.values(reviewerIdsPerJob).forEach(s => s.forEach(id => allReviewerIds.add(id)));
 
-        // Fetch reviewer names from team_members_public
         let reviewerNameMap: Record<string, string> = {};
         if (allReviewerIds.size > 0) {
           const ids = Array.from(allReviewerIds);
-          // Try matching by id or auth_user_id
           const { data: members } = await dbPublic
             .from("team_members_public")
             .select("id, auth_user_id, full_name, first_name, last_name")
@@ -150,21 +144,31 @@ Deno.serve(async (req) => {
         if (params.status && params.status !== "all") {
           query = query.eq("status", params.status);
         }
-        // If reviewer_only flag is set, filter by assigned_reviewer_id (auth_user_id OR team_member_id)
         if (params.reviewer_only) {
-          // First find team_member_id for this user
+          // Get user's email from team_members_public
           const { data: tm } = await dbPublic
             .from("team_members_public")
-            .select("id")
+            .select("id, email")
             .eq("auth_user_id", userId)
             .maybeSingle();
-          
-          if (tm) {
-            // Match either auth_user_id or team_member_id
-            query = query.or(`assigned_reviewer_id.eq.${userId},assigned_reviewer_id.eq.${tm.id}`);
-          } else {
-            query = query.eq("assigned_reviewer_id", userId);
+
+          // Also check hr_reviewers by email to find team_member_id used for assignment
+          const possibleIds = [userId];
+          if (tm?.id) possibleIds.push(tm.id);
+
+          if (tm?.email) {
+            // Find hr_reviewer record by email to get any alternative IDs
+            const { data: reviewer } = await db
+              .from("hr_reviewers")
+              .select("id, auth_user_id")
+              .eq("email", tm.email)
+              .eq("active", true)
+              .maybeSingle();
+            if (reviewer?.id) possibleIds.push(reviewer.id);
           }
+
+          const uniqueIds = [...new Set(possibleIds)];
+          query = query.or(uniqueIds.map(id => `assigned_reviewer_id.eq.${id}`).join(","));
         }
         const { data, error } = await query;
         if (error) throw error;
@@ -222,7 +226,6 @@ Deno.serve(async (req) => {
       }
 
       case "add_reviewer": {
-        // params: auth_user_id, full_name, email
         const { error } = await db.from("hr_reviewers").insert({
           auth_user_id: params.auth_user_id,
           full_name: params.full_name,
@@ -233,7 +236,6 @@ Deno.serve(async (req) => {
       }
 
       case "remove_reviewer": {
-        // Soft-delete: set active = false
         const { error } = await db
           .from("hr_reviewers")
           .update({ active: false })
@@ -243,10 +245,8 @@ Deno.serve(async (req) => {
       }
 
       case "assign_reviewer": {
-        // params: application_id, reviewer_id (id from team_members_public)
         const { application_id, reviewer_id } = params;
 
-        // Get current application status
         const { data: app, error: appErr } = await db
           .from("applications")
           .select("status, first_name, last_name, job_id")
@@ -256,7 +256,6 @@ Deno.serve(async (req) => {
 
         const oldStatus = app.status;
 
-        // Get team member info from team_members_public by id
         const { data: member, error: memErr } = await dbPublic
           .from("team_members_public")
           .select("id, auth_user_id, full_name, email")
@@ -264,10 +263,9 @@ Deno.serve(async (req) => {
           .single();
         if (memErr) throw memErr;
 
-        // Use auth_user_id if available, otherwise use team_member_id
         const assigneeId = member.auth_user_id || member.id;
 
-        // Auto-add to hr_reviewers (upsert by email since auth_user_id may be null)
+        // Auto-add to hr_reviewers
         const { error: upsertErr } = await db
           .from("hr_reviewers")
           .upsert(
@@ -281,7 +279,6 @@ Deno.serve(async (req) => {
           );
         if (upsertErr) {
           console.error("hr_reviewers upsert error:", upsertErr);
-          // Try insert if upsert fails
           const { error: insertErr } = await db
             .from("hr_reviewers")
             .insert({
@@ -304,7 +301,6 @@ Deno.serve(async (req) => {
           .eq("id", application_id);
         if (updErr) throw updErr;
 
-        // Insert status log
         const { error: logErr } = await db
           .from("application_status_log")
           .insert({
@@ -315,26 +311,22 @@ Deno.serve(async (req) => {
           });
         if (logErr) throw logErr;
 
-        // Get job title for email
         const { data: job } = await db
           .from("jobs")
           .select("title")
           .eq("id", app.job_id)
           .single();
 
-        // Send email notification to reviewer via Maileroo
+        // Send email notification to reviewer
         const mailerooKey = Deno.env.get("MAILEROO_API_KEY");
         if (mailerooKey && member.email) {
           try {
-            const firstName = app.first_name || '';
-            const lastName = app.last_name || '';
-            // Mask half of each name with dots for privacy
             const maskHalf = (s: string) => {
               if (!s) return '';
               const half = Math.ceil(s.length / 2);
               return s.slice(0, half) + '•'.repeat(s.length - half);
             };
-            const maskedName = `${maskHalf(firstName)} ${maskHalf(lastName)}`.trim();
+            const maskedName = `${maskHalf(app.first_name || '')} ${maskHalf(app.last_name || '')}`.trim();
             const jobTitle = job?.title || 'Nieznane stanowisko';
             await fetch("https://smtp.maileroo.com/api/v2/emails", {
               method: "POST",
@@ -365,18 +357,149 @@ Deno.serve(async (req) => {
       }
 
       case "check_is_reviewer": {
-        const { data, error } = await db
+        // 1. Try by auth_user_id
+        const { data: byId } = await db
           .from("hr_reviewers")
           .select("id")
           .eq("auth_user_id", userId)
           .eq("active", true)
           .maybeSingle();
-        if (error) throw error;
-        return json({ is_reviewer: !!data });
+        
+        if (byId) return json({ is_reviewer: true });
+
+        // 2. Fallback: find user email from team_members_public, then match by email
+        const { data: tm } = await dbPublic
+          .from("team_members_public")
+          .select("email")
+          .eq("auth_user_id", userId)
+          .maybeSingle();
+
+        if (tm?.email) {
+          const { data: byEmail } = await db
+            .from("hr_reviewers")
+            .select("id")
+            .eq("email", tm.email)
+            .eq("active", true)
+            .maybeSingle();
+
+          if (byEmail) {
+            // Auto-link auth_user_id for future lookups
+            await db
+              .from("hr_reviewers")
+              .update({ auth_user_id: userId })
+              .eq("id", byEmail.id);
+            return json({ is_reviewer: true });
+          }
+        }
+
+        return json({ is_reviewer: false });
+      }
+
+      // ─── SUBMIT REVIEW (reviewer submits decision + notes atomically) ───
+      case "submit_review": {
+        const { application_id, status, notes } = params;
+        if (!['accepted', 'rejected'].includes(status)) {
+          return json({ error: "Status must be 'accepted' or 'rejected'" }, 400);
+        }
+
+        // Get current application
+        const { data: app, error: appErr } = await db
+          .from("applications")
+          .select("status, first_name, last_name, job_id")
+          .eq("id", application_id)
+          .single();
+        if (appErr) throw appErr;
+
+        const oldStatus = app.status;
+
+        // Update application atomically
+        const { error: updErr } = await db
+          .from("applications")
+          .update({
+            status,
+            recruiter_notes: notes || null,
+            reviewed_by: userId,
+            reviewed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", application_id);
+        if (updErr) throw updErr;
+
+        // Insert status log
+        const { error: logErr } = await db
+          .from("application_status_log")
+          .insert({
+            application_id,
+            old_status: oldStatus,
+            new_status: status,
+            changed_by: userId,
+          });
+        if (logErr) throw logErr;
+
+        // Get reviewer name
+        const { data: reviewerTm } = await dbPublic
+          .from("team_members_public")
+          .select("full_name, email")
+          .eq("auth_user_id", userId)
+          .maybeSingle();
+        const reviewerName = reviewerTm?.full_name || reviewerTm?.email || 'Nieznany recenzent';
+
+        // Get job title
+        const { data: job } = await db
+          .from("jobs")
+          .select("title")
+          .eq("id", app.job_id)
+          .single();
+        const jobTitle = job?.title || 'Nieznane stanowisko';
+
+        // Mask candidate name
+        const maskHalf = (s: string) => {
+          if (!s) return '';
+          const half = Math.ceil(s.length / 2);
+          return s.slice(0, half) + '•'.repeat(s.length - half);
+        };
+        const maskedName = `${maskHalf(app.first_name || '')} ${maskHalf(app.last_name || '')}`.trim();
+
+        const decisionLabel = status === 'accepted' ? '✅ Zaakceptowany' : '❌ Odrzucony';
+
+        // Send email to admins
+        const mailerooKey = Deno.env.get("MAILEROO_API_KEY");
+        if (mailerooKey) {
+          for (const adminEmail of ADMIN_EMAILS) {
+            try {
+              await fetch("https://smtp.maileroo.com/api/v2/emails", {
+                method: "POST",
+                headers: {
+                  "X-API-Key": mailerooKey,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  from: { address: "app.assistant@mmorska.eu", display_name: "MMorska Rekrutacja" },
+                  to: [{ address: adminEmail }],
+                  subject: `Recenzja: ${maskedName} — ${decisionLabel}`,
+                  html: `
+                    <h2>Nowa recenzja kandydata</h2>
+                    <p><strong>Recenzent:</strong> ${reviewerName}</p>
+                    <p><strong>Kandydat:</strong> ${maskedName}</p>
+                    <p><strong>Stanowisko:</strong> ${jobTitle}</p>
+                    <p><strong>Decyzja:</strong> ${decisionLabel}</p>
+                    ${notes ? `<p><strong>Notatka:</strong></p><blockquote style="border-left:3px solid #ccc;padding-left:12px;color:#555;">${notes}</blockquote>` : ''}
+                    <br/>
+                    <p>Przejdź do <a href="https://praca.mmorska.eu" style="color:#2563eb;">panelu rekrutacyjnego</a> aby zobaczyć szczegóły.</p>
+                    <p style="color:#888;font-size:12px;">MMorska — Panel Rekrutacyjny</p>
+                  `,
+                }),
+              });
+            } catch (emailErr) {
+              console.error("Failed to send admin review notification:", emailErr);
+            }
+          }
+        }
+
+        return json({ ok: true });
       }
 
       case "list_team_members": {
-        // Return team members from public schema for reviewer selection
         const { data, error } = await dbPublic
           .from("team_members_public")
           .select("id, auth_user_id, full_name, email, active")

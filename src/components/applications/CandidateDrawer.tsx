@@ -21,7 +21,7 @@ interface CandidateDrawerProps {
 }
 
 const baseStatusActions = [
-  { value: 'reviewing', label: 'W ocenie', className: 'bg-sky-600 text-white hover:bg-sky-700 border-sky-600' },
+  { value: 'reviewing', label: 'U recenzenta', className: 'bg-sky-600 text-white hover:bg-sky-700 border-sky-600' },
   { value: 'hold', label: 'Hold', className: 'bg-amber-500 text-white hover:bg-amber-600 border-amber-500' },
   { value: 'accepted', label: 'Zaakceptuj', className: 'bg-emerald-600 text-white hover:bg-emerald-700 border-emerald-600' },
   { value: 'rejected', label: 'Odrzuć', className: 'bg-red-600 text-white hover:bg-red-700 border-red-600' },
@@ -38,6 +38,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const { user, isReviewer, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
+  const [reviewNotes, setReviewNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
   const [showCvPreview, setShowCvPreview] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>('');
@@ -45,6 +46,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   useEffect(() => {
     if (application) {
       setNotes(application.recruiter_notes || '');
+      setReviewNotes('');
       setCvSignedUrl(null);
       setSelectedReviewerId('');
       const cvPath = application.cv_url;
@@ -93,6 +95,23 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
       onClose();
     },
     onError: () => toast.error('Nie udało się zmienić statusu'),
+  });
+
+  const submitReviewMutation = useMutation({
+    mutationFn: async (decision: 'accepted' | 'rejected') => {
+      await hrApi('submit_review', {
+        application_id: application.id,
+        status: decision,
+        notes: reviewNotes,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['status-history', application?.id] });
+      toast.success('Recenzja zapisana i wysłana');
+      onClose();
+    },
+    onError: () => toast.error('Nie udało się zapisać recenzji'),
   });
 
   const assignReviewerMutation = useMutation({
@@ -206,76 +225,88 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
 
           <Separator />
 
-          <div>
-            <h3 className="mb-2 text-sm font-medium">Notatki rekrutera</h3>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-            <Button size="sm" variant="outline" className="mt-2 gap-1" onClick={() => notesMutation.mutate()}>
-              <Save className="h-3 w-3" /> Zapisz notatki
-            </Button>
-          </div>
-
-          <Separator />
-
-          {/* Reviewer assignment - visible for managers/admins */}
-          {!isReviewer && (
-            <div>
-              <div className="flex items-center gap-2 text-sm font-medium mb-2">
-                <UserCheck className="h-4 w-4 text-primary" />
-                Przypisz recenzenta
-              </div>
-              {application.assigned_reviewer_id && (
-                <p className="text-xs text-muted-foreground mb-2">
-                  Aktualnie przypisany: <span className="font-medium text-foreground">
-                    {filteredTeamMembers.find((m: any) => m.id === application.assigned_reviewer_id || m.auth_user_id === application.assigned_reviewer_id)?.full_name || application.assigned_reviewer_id}
-                  </span>
-                </p>
-              )}
-              <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Wybierz recenzenta..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredTeamMembers.map((m: any) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.full_name} ({m.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                className="mt-2"
-                onClick={() => assignReviewerMutation.mutate()}
-                disabled={!selectedReviewerId || assignReviewerMutation.isPending}
-              >
-                Przypisz
-              </Button>
-            </div>
-          )}
-
-          <Separator />
-
-          <div>
-            <h3 className="mb-2 text-sm font-medium">Zmień status</h3>
-            <div className="flex flex-wrap gap-2">
-              {visibleActions.map((s) => (
+          {/* Reviewer: unified review block */}
+          {isReviewer ? (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <h3 className="text-sm font-medium">Twoja recenzja</h3>
+              <Textarea
+                placeholder="Wpisz swoją notatkę do recenzji..."
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+                rows={4}
+              />
+              <div className="flex gap-2">
                 <Button
-                  key={s.value}
                   size="sm"
-                  variant="outline"
-                  className={`${s.className} ${application.status === s.value ? 'ring-2 ring-ring' : 'opacity-70'}`}
-                  onClick={() => handleStatusClick(s.value)}
-                  disabled={statusMutation.isPending || assignReviewerMutation.isPending}
+                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => submitReviewMutation.mutate('accepted')}
+                  disabled={submitReviewMutation.isPending}
                 >
-                  {s.label}
+                  ✅ Zaakceptuj
                 </Button>
-              ))}
+                <Button
+                  size="sm"
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  onClick={() => submitReviewMutation.mutate('rejected')}
+                  disabled={submitReviewMutation.isPending}
+                >
+                  ❌ Odrzuć
+                </Button>
+              </div>
             </div>
-            {advancedActions.length > 0 && (
-              <>
-                <h4 className="mt-3 mb-2 text-xs font-medium text-muted-foreground">Kolejny etap rekrutacji</h4>
+          ) : (
+            <>
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Notatki rekrutera</h3>
+                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+                <Button size="sm" variant="outline" className="mt-2 gap-1" onClick={() => notesMutation.mutate()}>
+                  <Save className="h-3 w-3" /> Zapisz notatki
+                </Button>
+              </div>
+
+              <Separator />
+
+              {/* Reviewer assignment */}
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                  <UserCheck className="h-4 w-4 text-primary" />
+                  Przypisz recenzenta
+                </div>
+                {application.assigned_reviewer_id && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Aktualnie przypisany: <span className="font-medium text-foreground">
+                      {filteredTeamMembers.find((m: any) => m.id === application.assigned_reviewer_id || m.auth_user_id === application.assigned_reviewer_id)?.full_name || application.assigned_reviewer_id}
+                    </span>
+                  </p>
+                )}
+                <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Wybierz recenzenta..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredTeamMembers.map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.full_name} ({m.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => assignReviewerMutation.mutate()}
+                  disabled={!selectedReviewerId || assignReviewerMutation.isPending}
+                >
+                  Przypisz
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Zmień status</h3>
                 <div className="flex flex-wrap gap-2">
-                  {advancedActions.map((s) => (
+                  {visibleActions.map((s) => (
                     <Button
                       key={s.value}
                       size="sm"
@@ -288,9 +319,28 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
                     </Button>
                   ))}
                 </div>
-              </>
-            )}
-          </div>
+                {advancedActions.length > 0 && (
+                  <>
+                    <h4 className="mt-3 mb-2 text-xs font-medium text-muted-foreground">Kolejny etap rekrutacji</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {advancedActions.map((s) => (
+                        <Button
+                          key={s.value}
+                          size="sm"
+                          variant="outline"
+                          className={`${s.className} ${application.status === s.value ? 'ring-2 ring-ring' : 'opacity-70'}`}
+                          onClick={() => handleStatusClick(s.value)}
+                          disabled={statusMutation.isPending || assignReviewerMutation.isPending}
+                        >
+                          {s.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
           {statusHistory && statusHistory.length > 0 && (
             <div>

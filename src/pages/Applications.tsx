@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 const statusFilters = [
   { value: 'all', label: 'Wszystkie' },
   { value: 'new', label: 'Nowe' },
-  { value: 'reviewing', label: 'W ocenie' },
+  { value: 'reviewing', label: 'U recenzenta' },
   { value: 'hold', label: 'Hold' },
   { value: 'accepted', label: 'Zaakceptowane' },
   { value: 'rejected', label: 'Odrzucone' },
@@ -28,7 +28,7 @@ const statusFilters = [
 
 const statusBadge: Record<string, { label: string; className: string }> = {
   new: { label: 'Nowe', className: 'bg-blue-600 text-white border-blue-600' },
-  reviewing: { label: 'W ocenie', className: 'bg-sky-600 text-white border-sky-600' },
+  reviewing: { label: 'U recenzenta', className: 'bg-sky-600 text-white border-sky-600' },
   hold: { label: 'Hold', className: 'bg-amber-500 text-white border-amber-500' },
   accepted: { label: 'Zaakceptowane', className: 'bg-emerald-600 text-white border-emerald-600' },
   rejected: { label: 'Odrzucone', className: 'bg-red-600 text-white border-red-600' },
