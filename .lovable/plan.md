@@ -1,70 +1,59 @@
-## MMorska — Wewnętrzny Panel Rekrutera
 
-### Przegląd
 
-Aplikacja do zarządzania rekrutacją: ogłoszenia o pracę, kandydatury z AI summary, zmiana statusów z logowaniem historii, ustawienia formularza. Ciemny/jasny motyw do wyboru, logowanie wyłącznie przez Microsoft Azure AD.
+## Plan: Naprawa widoku recenzenta + status "U recenzenta" + notyfikacja email
 
-### Konfiguracja
+### Problemy do rozwiązania
 
-1. **Logo MMorska** — skopiowanie przesłanego pliku do `src/assets/`
-2. **Supabase client** — dodanie schematu `hr` do konfiguracji klienta (`db: { schema: 'hr' }`)
-3. **Motyw ciemny** — przebudowa CSS variables: tło `#130f0c`, sidebar `#1a1410`, karty `#211b17`, obramowania `#2e2620`, akcent `#0ea5e9`
-4. **Font Inter** — import z Google Fonts
+1. **Recenzent nie widzi kandydatów** — `check_is_reviewer` szuka tylko po `auth_user_id` w `hr_reviewers`, ale przy przypisywaniu recenzenta `auth_user_id` może być NULL (pracownik jeszcze się nie logował). Po zalogowaniu, dopasowanie nie następuje. Trzeba szukać też po emailu.
+2. **Status po przypisaniu** — ma być "U recenzenta" zamiast "W ocenie".
+3. **Recenzent musi zostawić notatkę i zmienić status** — obecnie notatki i status to osobne akcje. Recenzent powinien móc zapisać wszystko jednym przyciskiem.
+4. **Email do admina po recenzji** — brak powiadomienia gdy recenzent zakończy ocenę.
 
-### Autoryzacja
+### Zmiany
 
-- `AuthProvider` context z `onAuthStateChange` + `getSession`
-- `supabase.auth.signInWithOAuth({ provider: 'azure' })` — jedyna metoda logowania
-- `ProtectedRoute` component — brak sesji → redirect `/login`
-- Przycisk wylogowania w sidebarze
+#### 1. Edge Function `supabase/functions/hr-api/index.ts`
 
-### Strona `/login`
+- **`check_is_reviewer`**: Dodać sprawdzenie po emailu — pobrać email użytkownika z `team_members_public` i dopasować do `hr_reviewers.email`.
+- **`assign_reviewer`**: Zmienić status z `"reviewing"` na `"reviewing"` (bez zmian w bazie), ale zmienić etykietę w UI.
+- **`list_applications`** (reviewer filter): Dodać dopasowanie po emailu oprócz ID — pobrać email z `team_members_public`, znaleźć odpowiedni `hr_reviewers` rekord, i filtrować `assigned_reviewer_id` po obu wartościach (auth_user_id i team_member_id).
+- **Nowa akcja `submit_review`**: Przyjmuje `application_id`, `status` (accepted/rejected), `notes`. Atomowo aktualizuje status + notatki, loguje zmianę statusu, wysyła email do adminów (ADMIN_EMAILS) z informacją o decyzji recenzenta.
 
-- Wyśrodkowane logo MMorska na ciemnym tle
-- Przycisk "Zaloguj przez Microsoft" z ikoną Windows
-- Brak pól email/hasło
+#### 2. `src/pages/Applications.tsx`
 
-### Layout z Sidebarem
+- Zmienić etykietę statusu `reviewing` z "W ocenie" na "U recenzenta" (zarówno w filtrach jak i w badge).
 
-- Ciemny sidebar z linkami: Ogłoszenia, Ustawienia
-- Przycisk "Wyloguj" na dole
-- Kompaktowy, profesjonalny design
+#### 3. `src/components/applications/CandidateDrawer.tsx`
 
-### Strona `/jobs` — Ogłoszenia
+- Dla recenzenta: dodać pole notatki + przyciski Akceptuj/Odrzuć w jednym bloku. Kliknięcie przycisku wysyła `submit_review` (notatki + status razem).
+- Po zatwierdzeniu: toast + zamknięcie drawera.
 
-- Tabela: Tytuł, Dział, Status (badge: draft=szary, active=zielony, closed=czerwony), Liczba kandydatur, Data utworzenia, Akcje (edytuj/usuń)
-- Przycisk "Nowe ogłoszenie" → modal z formularzem
-- Formularz: Tytuł, Dział, Opis, Obowiązki (dynamiczna lista), Wymagania (dynamiczna lista), Status
-- Kliknięcie wiersza → nawigacja do `/jobs/:id/applications`
-- Liczba kandydatur pobierana z `hr.applications` (count per job)
+#### 4. `src/contexts/AuthContext.tsx`
 
-### Strona `/jobs/:id/applications` — Kandydatury
+- W `check_is_reviewer` fallback: jeśli nie znaleziono po `auth_user_id`, sprawdzić po emailu (ta logika przeniesiona do edge function).
 
-- Nagłówek z nazwą stanowiska + link powrotny
-- Taby/filtry statusu: Wszystkie / Nowe / W ocenie / Hold / Zaakceptowane / Odrzucone
-- Tabela: Imię i nazwisko, Email, Data aplikacji, Status (badge), AI Summary (skrócone 80 zn.), Akcje
-- Kliknięcie wiersza → drawer boczny
+### Szczegóły techniczne
 
-### Drawer kandydata
+**`check_is_reviewer` — nowa logika:**
+```
+1. Szukaj w hr_reviewers po auth_user_id
+2. Jeśli brak → pobierz email z team_members_public po auth_user_id
+3. Szukaj w hr_reviewers po email
+4. Jeśli znaleziono → zaktualizuj auth_user_id w hr_reviewers (auto-link)
+```
 
-- Dane kontaktowe: imię, nazwisko, email, telefon
-- CV: link lub przycisk pobierania (zależnie od `cv_link` / `cv_url`)
-- List motywacyjny (przewijany)
-- Sekcja AI Summary z ikoną ✨ i wyróżnioną ramką
-- Edytowalne pole "Notatki rekrutera" z zapisem inline
-- Przyciski zmiany statusu (kolorowe, aktywny podświetlony)
-- **Zmiana statusu**: `UPDATE hr.applications` + `INSERT hr.application_status_log` w jednej operacji
-- Historia statusów — chronologiczna lista zmian
+**`submit_review` — flow:**
+```
+1. Pobierz aplikację (stary status, dane kandydata, job_id)
+2. UPDATE applications: status, recruiter_notes, reviewed_by, reviewed_at
+3. INSERT application_status_log
+4. Pobierz dane recenzenta (full_name)
+5. Pobierz tytuł stanowiska
+6. Wyślij email do ADMIN_EMAILS via Maileroo z informacją:
+   - Kto ocenił (recenzent)
+   - Jakiego kandydata (zamaskowane imię)
+   - Jaka decyzja (accepted/rejected)
+   - Notatka recenzenta
+```
 
-### Strona `/settings` — Ustawienia formularza
+**Zmiana etykiety statusu:** Tylko w UI — wartość w bazie pozostaje `"reviewing"`, ale wyświetla się jako "U recenzenta".
 
-- Formularz z polami z `hr.form_config` (klucz-wartość)
-- Pola: tytuł/opis nagłówka, kroki procesu, tagi "Pracujemy w" (chips), tekst RODO, ekran sukcesu
-- Przycisk "Zapisz zmiany" → upsert do `hr.form_config`
-
-### Ważne szczegóły techniczne
-
-- Schemat `hr` musi być eksponowany w Supabase Dashboard (API Settings → Exposed schemas)
-- Osobny klient Supabase lub parametr `schema: 'hr'` przy każdym zapytaniu
-- Brak jakiegokolwiek email/password auth w kodzie
-- Status change = UPDATE + INSERT log (atomowo)
