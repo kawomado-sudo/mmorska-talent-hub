@@ -21,7 +21,7 @@ interface CandidateDrawerProps {
 }
 
 const baseStatusActions = [
-  { value: 'reviewing', label: 'W ocenie', className: 'bg-sky-600 text-white hover:bg-sky-700 border-sky-600' },
+  { value: 'reviewing', label: 'U recenzenta', className: 'bg-sky-600 text-white hover:bg-sky-700 border-sky-600' },
   { value: 'hold', label: 'Hold', className: 'bg-amber-500 text-white hover:bg-amber-600 border-amber-500' },
   { value: 'accepted', label: 'Zaakceptuj', className: 'bg-emerald-600 text-white hover:bg-emerald-700 border-emerald-600' },
   { value: 'rejected', label: 'Odrzuć', className: 'bg-red-600 text-white hover:bg-red-700 border-red-600' },
