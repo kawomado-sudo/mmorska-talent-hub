@@ -252,8 +252,10 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
                 placeholder="Wpisz swoją notatkę do recenzji..."
                 value={reviewNotes}
                 onChange={(e) => setReviewNotes(e.target.value)}
-                rows={4}
+                rows={6}
+                maxLength={1500}
               />
+              <p className="text-xs text-muted-foreground text-right mt-1">{reviewNotes.length} / 1500</p>
               <div className="flex gap-2">
                 <Button
                   size="sm"
