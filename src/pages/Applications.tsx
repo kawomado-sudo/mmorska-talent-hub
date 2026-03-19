@@ -8,10 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ArrowLeft, FileUp, Loader2, LayoutList, LayoutGrid } from 'lucide-react';
 import { CandidateDrawer } from '@/components/applications/CandidateDrawer';
 import { KanbanBoard } from '@/components/applications/KanbanBoard';
 import { toast } from 'sonner';
+
+const getInitials = (name: string) => {
+  if (!name) return '?';
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+};
 
 const statusFilters = [
   { value: 'all', label: 'Wszystkie' },

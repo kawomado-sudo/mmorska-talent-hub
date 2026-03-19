@@ -145,19 +145,16 @@ Deno.serve(async (req) => {
           query = query.eq("status", params.status);
         }
         if (params.reviewer_only) {
-          // Get user's email from team_members_public
           const { data: tm } = await dbPublic
             .from("team_members_public")
             .select("id, email")
             .eq("auth_user_id", userId)
             .maybeSingle();
 
-          // Also check hr_reviewers by email to find team_member_id used for assignment
           const possibleIds = [userId];
           if (tm?.id) possibleIds.push(tm.id);
 
           if (tm?.email) {
-            // Find hr_reviewer record by email to get any alternative IDs
             const { data: reviewer } = await db
               .from("hr_reviewers")
               .select("id, auth_user_id")
@@ -172,7 +169,28 @@ Deno.serve(async (req) => {
         }
         const { data, error } = await query;
         if (error) throw error;
-        return json(data);
+
+        // Resolve reviewer names
+        const reviewerIds = [...new Set((data || []).filter((a: any) => a.assigned_reviewer_id).map((a: any) => a.assigned_reviewer_id))];
+        let reviewerNameMap: Record<string, string> = {};
+        if (reviewerIds.length > 0) {
+          const { data: members } = await dbPublic
+            .from("team_members_public")
+            .select("id, auth_user_id, full_name, first_name, last_name")
+            .or(reviewerIds.map((id: string) => `id.eq.${id}`).concat(reviewerIds.map((id: string) => `auth_user_id.eq.${id}`)).join(","));
+          members?.forEach((m: any) => {
+            const name = m.full_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || "?";
+            if (m.id) reviewerNameMap[m.id] = name;
+            if (m.auth_user_id) reviewerNameMap[m.auth_user_id] = name;
+          });
+        }
+
+        const enriched = (data || []).map((a: any) => ({
+          ...a,
+          reviewer_name: a.assigned_reviewer_id ? (reviewerNameMap[a.assigned_reviewer_id] || null) : null,
+        }));
+
+        return json(enriched);
       }
 
       case "get_application": {
