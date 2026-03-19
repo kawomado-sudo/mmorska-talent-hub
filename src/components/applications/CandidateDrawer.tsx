@@ -341,7 +341,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
               </div>
             </>
           )}
-          </div>
 
           {statusHistory && statusHistory.length > 0 && (
             <div>
