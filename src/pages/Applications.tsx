@@ -28,7 +28,7 @@ const statusFilters = [
 
 const statusBadge: Record<string, { label: string; className: string }> = {
   new: { label: 'Nowe', className: 'bg-blue-600 text-white border-blue-600' },
-  reviewing: { label: 'W ocenie', className: 'bg-sky-600 text-white border-sky-600' },
+  reviewing: { label: 'U recenzenta', className: 'bg-sky-600 text-white border-sky-600' },
   hold: { label: 'Hold', className: 'bg-amber-500 text-white border-amber-500' },
   accepted: { label: 'Zaakceptowane', className: 'bg-emerald-600 text-white border-emerald-600' },
   rejected: { label: 'Odrzucone', className: 'bg-red-600 text-white border-red-600' },
