@@ -18,6 +18,7 @@ interface CandidateDrawerProps {
   application: any;
   onClose: () => void;
   jobId: string;
+  onDelete?: (app: any) => void;
 }
 
 const baseStatusActions = [
