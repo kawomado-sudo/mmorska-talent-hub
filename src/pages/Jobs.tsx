@@ -22,6 +22,7 @@ interface Job {
   published_at: string | null;
   closed_at: string | null;
   application_count?: number;
+  reviewers?: string[];
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
