@@ -279,7 +279,8 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
             <>
               <div>
                 <h3 className="mb-2 text-sm font-medium">Notatki rekrutera</h3>
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={5} maxLength={1500} />
+                <p className="text-xs text-muted-foreground text-right mt-1">{notes.length} / 1500</p>
                 <Button size="sm" variant="outline" className="mt-2 gap-1" onClick={() => notesMutation.mutate()}>
                   <Save className="h-3 w-3" /> Zapisz notatki
                 </Button>
