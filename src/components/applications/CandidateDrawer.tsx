@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hrApi } from '@/lib/hr-api';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,6 +40,8 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
   const [notes, setNotes] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
+  const [cvLoading, setCvLoading] = useState(false);
+  const [cvError, setCvError] = useState(false);
   const [showCvPreview, setShowCvPreview] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>('');
 
@@ -49,12 +50,21 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
       setNotes(application.recruiter_notes || '');
       setReviewNotes('');
       setCvSignedUrl(null);
+      setCvError(false);
       setSelectedReviewerId('');
       const cvPath = application.cv_url;
       if (cvPath && !cvPath.startsWith('http')) {
-        supabase.storage.from('hr-cv').createSignedUrl(cvPath, 3600).then(({ data }) => {
-          if (data?.signedUrl) setCvSignedUrl(data.signedUrl);
-        });
+        setCvLoading(true);
+        hrApi<{ signed_url: string }>('get_cv_signed_url', { application_id: application.id })
+          .then((res) => {
+            setCvSignedUrl(res.signed_url);
+          })
+          .catch((err) => {
+            console.error('CV signed URL error:', err);
+            setCvError(true);
+            toast.error('Nie udało się załadować CV');
+          })
+          .finally(() => setCvLoading(false));
       } else if (cvPath) {
         setCvSignedUrl(cvPath);
       }
@@ -181,6 +191,14 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
             <div><span className="text-muted-foreground">Email:</span> {application.email}</div>
             {application.phone && <div><span className="text-muted-foreground">Telefon:</span> {application.phone}</div>}
           </div>
+
+          {cvLoading && (
+            <p className="text-sm text-muted-foreground">Ładowanie CV…</p>
+          )}
+
+          {cvError && !cvSignedUrl && (
+            <p className="text-sm text-destructive">Nie udało się załadować podglądu CV.</p>
+          )}
 
           {cvSignedUrl && (
             <div className="flex gap-2">
