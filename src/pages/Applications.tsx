@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 const statusFilters = [
   { value: 'all', label: 'Wszystkie' },
   { value: 'new', label: 'Nowe' },
-  { value: 'reviewing', label: 'W ocenie' },
+  { value: 'reviewing', label: 'U recenzenta' },
   { value: 'hold', label: 'Hold' },
   { value: 'accepted', label: 'Zaakceptowane' },
   { value: 'rejected', label: 'Odrzucone' },
