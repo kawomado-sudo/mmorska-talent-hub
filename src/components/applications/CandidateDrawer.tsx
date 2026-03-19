@@ -46,6 +46,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   useEffect(() => {
     if (application) {
       setNotes(application.recruiter_notes || '');
+      setReviewNotes('');
       setCvSignedUrl(null);
       setSelectedReviewerId('');
       const cvPath = application.cv_url;
