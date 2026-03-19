@@ -362,7 +362,6 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
             </div>
           )}
         </div>
-        </div>
       </SheetContent>
     </Sheet>
 
