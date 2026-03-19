@@ -1,57 +1,50 @@
 
 
-## Plan: Kolumna recenzenta (inicjały) + weryfikacja zapisu recenzji
-
-### Co robimy
-
-1. **Dodanie kolumny "Recenzent" w tabeli kandydatur** — wyświetla inicjały przypisanego recenzenta (np. "JK" dla Jan Kowalski).
-2. **Weryfikacja flow zapisu recenzji** — upewnienie się, że `submit_review` poprawnie zapisuje dane.
+## Plan: Zapobieganie duplikatom + usuwanie kandydatów (RODO)
 
 ### Zmiany
 
-#### 1. Edge Function `supabase/functions/hr-api/index.ts` — `list_applications`
+#### 1. Edge Function `supabase/functions/parse-cv/index.ts` — sprawdzanie duplikatów
 
-Aktualnie `list_applications` zwraca surowe dane z `hr.applications`, w tym `assigned_reviewer_id`, ale **nie rozwiązuje go na imię/nazwisko**. Trzeba:
+Przed insertem do `hr.applications` sprawdzić, czy kandydat o tym samym emailu (lub imię+nazwisko jeśli brak emaila) już istnieje dla danego `job_id`. Jeśli tak — zwrócić błąd 409 z komunikatem "Kandydat z tym adresem email już aplikował na to stanowisko".
 
-- Po pobraniu aplikacji, zebrać unikalne `assigned_reviewer_id`.
-- Pobrać odpowiadające rekordy z `team_members_public` (po `id` i `auth_user_id`).
-- Dołączyć do każdej aplikacji pole `reviewer_name` z pełnym imieniem recenzenta.
+#### 2. Edge Function `supabase/functions/hr-api/index.ts` — nowa akcja `delete_application`
 
-#### 2. `src/pages/Applications.tsx`
+Nowa akcja, która:
+- Pobiera aplikację po ID (w tym `cv_url`)
+- Usuwa plik CV z bucketu `hr-cv` (jeśli istnieje)
+- Usuwa powiązane wpisy z `hr.application_status_log`
+- Usuwa rekord z `hr.applications`
+- Zwraca `{ ok: true }`
 
-- Dodać kolumnę **"Recenzent"** w nagłówku tabeli (po "Status", przed "Dopasowanie AI").
-- Wyświetlać inicjały z `reviewer_name` (np. "Jan Kowalski" → "JK") w okrągłym badge/avatar.
-- Jeśli brak recenzenta — wyświetlić "—".
-- Zaktualizować `colSpan` w pustym wierszu.
+Dostępna tylko dla adminów/managerów (nie recenzentów).
 
-#### 3. Weryfikacja zapisu recenzji
+#### 3. UI `src/pages/Applications.tsx` — przycisk usunięcia
 
-`submit_review` zapisuje do `hr.applications`:
-- `status` → `accepted` lub `rejected`
-- `recruiter_notes` → notatka recenzenta
-- `reviewed_by` → UUID recenzenta
-- `reviewed_at` → timestamp
+Dodać ikonę kosza (Trash2) w każdym wierszu tabeli (widoczną tylko dla nie-recenzentów). Po kliknięciu — dialog potwierdzenia z informacją RODO ("Dane kandydata zostaną trwale usunięte zgodnie z RODO"). Po potwierdzeniu — wywołanie `delete_application`.
 
-Oraz do `hr.application_status_log`:
-- `old_status`, `new_status`, `changed_by`
+#### 4. UI `src/components/applications/CandidateDrawer.tsx` — przycisk usunięcia w drawerze
 
-To wygląda poprawnie — dane trafiają do tych dwóch tabel w schemacie `hr`.
+Dodać przycisk "Usuń kandydaturę" na dole drawera (tylko admin). Dialog potwierdzenia jak wyżej.
 
 ### Szczegóły techniczne
 
-**Generowanie inicjałów:**
+**Duplikaty — logika w parse-cv:**
 ```typescript
-const getInitials = (name: string) => {
-  if (!name) return '?';
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-};
+// Przed insertem:
+const { data: existing } = await supabase
+  .from("applications")
+  .select("id")
+  .eq("job_id", job_id)
+  .eq("email", parsed.email)
+  .maybeSingle();
+if (existing) return error 409 "Duplikat"
 ```
 
-**Rozszerzenie `list_applications` — mapowanie recenzentów:**
-```typescript
-// Po pobraniu data z applications:
-const reviewerIds = [...new Set(data.filter(a => a.assigned_reviewer_id).map(a => a.assigned_reviewer_id))];
-// Pobierz nazwy z team_members_public
-// Dołącz reviewer_name do każdego rekordu
+**Usuwanie — cascade:**
+```
+1. DELETE FROM hr.application_status_log WHERE application_id = X
+2. DELETE FROM hr.applications WHERE id = X
+3. supabase.storage.from('hr-cv').remove([cv_url])
 ```
 
