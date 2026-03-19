@@ -1,59 +1,57 @@
 
 
-## Plan: Naprawa widoku recenzenta + status "U recenzenta" + notyfikacja email
+## Plan: Kolumna recenzenta (inicjały) + weryfikacja zapisu recenzji
 
-### Problemy do rozwiązania
+### Co robimy
 
-1. **Recenzent nie widzi kandydatów** — `check_is_reviewer` szuka tylko po `auth_user_id` w `hr_reviewers`, ale przy przypisywaniu recenzenta `auth_user_id` może być NULL (pracownik jeszcze się nie logował). Po zalogowaniu, dopasowanie nie następuje. Trzeba szukać też po emailu.
-2. **Status po przypisaniu** — ma być "U recenzenta" zamiast "W ocenie".
-3. **Recenzent musi zostawić notatkę i zmienić status** — obecnie notatki i status to osobne akcje. Recenzent powinien móc zapisać wszystko jednym przyciskiem.
-4. **Email do admina po recenzji** — brak powiadomienia gdy recenzent zakończy ocenę.
+1. **Dodanie kolumny "Recenzent" w tabeli kandydatur** — wyświetla inicjały przypisanego recenzenta (np. "JK" dla Jan Kowalski).
+2. **Weryfikacja flow zapisu recenzji** — upewnienie się, że `submit_review` poprawnie zapisuje dane.
 
 ### Zmiany
 
-#### 1. Edge Function `supabase/functions/hr-api/index.ts`
+#### 1. Edge Function `supabase/functions/hr-api/index.ts` — `list_applications`
 
-- **`check_is_reviewer`**: Dodać sprawdzenie po emailu — pobrać email użytkownika z `team_members_public` i dopasować do `hr_reviewers.email`.
-- **`assign_reviewer`**: Zmienić status z `"reviewing"` na `"reviewing"` (bez zmian w bazie), ale zmienić etykietę w UI.
-- **`list_applications`** (reviewer filter): Dodać dopasowanie po emailu oprócz ID — pobrać email z `team_members_public`, znaleźć odpowiedni `hr_reviewers` rekord, i filtrować `assigned_reviewer_id` po obu wartościach (auth_user_id i team_member_id).
-- **Nowa akcja `submit_review`**: Przyjmuje `application_id`, `status` (accepted/rejected), `notes`. Atomowo aktualizuje status + notatki, loguje zmianę statusu, wysyła email do adminów (ADMIN_EMAILS) z informacją o decyzji recenzenta.
+Aktualnie `list_applications` zwraca surowe dane z `hr.applications`, w tym `assigned_reviewer_id`, ale **nie rozwiązuje go na imię/nazwisko**. Trzeba:
+
+- Po pobraniu aplikacji, zebrać unikalne `assigned_reviewer_id`.
+- Pobrać odpowiadające rekordy z `team_members_public` (po `id` i `auth_user_id`).
+- Dołączyć do każdej aplikacji pole `reviewer_name` z pełnym imieniem recenzenta.
 
 #### 2. `src/pages/Applications.tsx`
 
-- Zmienić etykietę statusu `reviewing` z "W ocenie" na "U recenzenta" (zarówno w filtrach jak i w badge).
+- Dodać kolumnę **"Recenzent"** w nagłówku tabeli (po "Status", przed "Dopasowanie AI").
+- Wyświetlać inicjały z `reviewer_name` (np. "Jan Kowalski" → "JK") w okrągłym badge/avatar.
+- Jeśli brak recenzenta — wyświetlić "—".
+- Zaktualizować `colSpan` w pustym wierszu.
 
-#### 3. `src/components/applications/CandidateDrawer.tsx`
+#### 3. Weryfikacja zapisu recenzji
 
-- Dla recenzenta: dodać pole notatki + przyciski Akceptuj/Odrzuć w jednym bloku. Kliknięcie przycisku wysyła `submit_review` (notatki + status razem).
-- Po zatwierdzeniu: toast + zamknięcie drawera.
+`submit_review` zapisuje do `hr.applications`:
+- `status` → `accepted` lub `rejected`
+- `recruiter_notes` → notatka recenzenta
+- `reviewed_by` → UUID recenzenta
+- `reviewed_at` → timestamp
 
-#### 4. `src/contexts/AuthContext.tsx`
+Oraz do `hr.application_status_log`:
+- `old_status`, `new_status`, `changed_by`
 
-- W `check_is_reviewer` fallback: jeśli nie znaleziono po `auth_user_id`, sprawdzić po emailu (ta logika przeniesiona do edge function).
+To wygląda poprawnie — dane trafiają do tych dwóch tabel w schemacie `hr`.
 
 ### Szczegóły techniczne
 
-**`check_is_reviewer` — nowa logika:**
-```
-1. Szukaj w hr_reviewers po auth_user_id
-2. Jeśli brak → pobierz email z team_members_public po auth_user_id
-3. Szukaj w hr_reviewers po email
-4. Jeśli znaleziono → zaktualizuj auth_user_id w hr_reviewers (auto-link)
-```
-
-**`submit_review` — flow:**
-```
-1. Pobierz aplikację (stary status, dane kandydata, job_id)
-2. UPDATE applications: status, recruiter_notes, reviewed_by, reviewed_at
-3. INSERT application_status_log
-4. Pobierz dane recenzenta (full_name)
-5. Pobierz tytuł stanowiska
-6. Wyślij email do ADMIN_EMAILS via Maileroo z informacją:
-   - Kto ocenił (recenzent)
-   - Jakiego kandydata (zamaskowane imię)
-   - Jaka decyzja (accepted/rejected)
-   - Notatka recenzenta
+**Generowanie inicjałów:**
+```typescript
+const getInitials = (name: string) => {
+  if (!name) return '?';
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+};
 ```
 
-**Zmiana etykiety statusu:** Tylko w UI — wartość w bazie pozostaje `"reviewing"`, ale wyświetla się jako "U recenzenta".
+**Rozszerzenie `list_applications` — mapowanie recenzentów:**
+```typescript
+// Po pobraniu data z applications:
+const reviewerIds = [...new Set(data.filter(a => a.assigned_reviewer_id).map(a => a.assigned_reviewer_id))];
+// Pobierz nazwy z team_members_public
+// Dołącz reviewer_name do każdego rekordu
+```
 
