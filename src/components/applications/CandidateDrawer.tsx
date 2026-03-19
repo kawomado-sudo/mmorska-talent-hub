@@ -38,6 +38,7 @@ export const CandidateDrawer = ({ application, onClose, jobId }: CandidateDrawer
   const { user, isReviewer, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
+  const [reviewNotes, setReviewNotes] = useState('');
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
   const [showCvPreview, setShowCvPreview] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>('');
