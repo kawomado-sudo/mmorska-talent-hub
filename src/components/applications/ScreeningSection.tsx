@@ -229,7 +229,7 @@ export function ScreeningSection({ applicationId, jobId }: ScreeningSectionProps
   });
 
   const invLink = invitation
-    ? `${window.location.origin}/screening-test/${invitation.token}`
+    ? `${window.location.origin}/screening/${invitation.token}`
     : null;
 
   const copyLink = () => {
