@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { getHrServiceClient } from "@/lib/supabase/server";
 import { getPublicSiteUrl } from "@/lib/env";
-import { runScreeningAnalysis, upsertAnalysisRow } from "@/lib/services/screeningAnalysis";
+import { runScreeningAnalysis, upsertAnalysisRow } from "@/lib/services/screeningAnalyzer";
 
 export type InvitationStatus = "pending" | "started" | "completed" | "expired";
 
