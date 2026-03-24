@@ -221,20 +221,25 @@ export function ScreeningDashboard() {
     setAssignMessage(null);
 
     try {
-      let chosenTemplate = templateChoice;
-      if (chosenTemplate === "__generate__") {
+      if (templateChoice === "__generate__") {
         const generateRes = await hrScreeningFetch("/api/hr/screening/generate", {
           method: "POST",
           accessToken: session.access_token,
-          body: JSON.stringify({ job_id: selectedApp.application.job_id }),
+          body: JSON.stringify({ application_id: selectedApp.application.id }),
         });
         const generateData = await generateRes.json();
-        if (!generateRes.ok || !generateData.template_id) {
-          throw new Error(generateData.error || "Failed to generate template");
+        if (!generateRes.ok || !generateData.invitation_id) {
+          throw new Error(generateData.error || "Failed to generate and assign screening");
         }
-        chosenTemplate = generateData.template_id;
+
+        const link = typeof generateData.url === "string" ? generateData.url : null;
+        setAssignMessage(link ? `Screening assigned successfully. Link: ${link}` : "Screening assigned successfully.");
+        await loadDashboard();
+        setAssignModalOpen(false);
+        return;
       }
 
+      const chosenTemplate = templateChoice;
       if (!chosenTemplate) {
         throw new Error("Please select a template.");
       }
