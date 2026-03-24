@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,8 @@ import {
   GripVertical,
   ChevronDown,
   ChevronUp,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,6 +60,52 @@ interface ScreeningTemplate {
   created_at: string;
   question_count?: number;
 }
+
+interface ScreeningInvitationRow {
+  id: string;
+  token: string;
+  status: 'pending' | 'started' | 'completed' | 'expired';
+  template_id: string | null;
+}
+
+interface ScreeningCandidateRow {
+  application_id: string;
+  candidate_name: string;
+  job_title: string;
+  status: string;
+  invitation: ScreeningInvitationRow | null;
+}
+
+interface ScreeningCandidateSourceRow {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  status: string | null;
+  jobs: { title: string | null } | null;
+  screening_invitations:
+    | Array<{
+        id: string;
+        token: string;
+        status: ScreeningInvitationRow['status'];
+        template_id: string | null;
+        created_at: string | null;
+      }>
+    | null;
+}
+
+interface ScreeningQuestionRow {
+  id: string;
+  skill_id: string | null;
+  question: string;
+  type: QuestionType;
+  options: QuestionOption[] | null;
+  scale_min: number | null;
+  scale_max: number | null;
+  order_index: number;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 type QuestionType = 'single' | 'multi' | 'text' | 'scale';
 
@@ -114,13 +163,108 @@ export default function Screening() {
   const [questions, setQuestions] = useState<LocalQuestion[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Fetch candidates currently in screening stage + invitation metadata
+  const {
+    data: screeningCandidates = [],
+    isLoading: screeningCandidatesLoading,
+    isError: screeningCandidatesError,
+    error: screeningCandidatesErrorDetails,
+  } = useQuery({
+    queryKey: ['screening_candidates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('applications')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          status,
+          jobs:job_id (
+            title
+          ),
+          screening_invitations (
+            id,
+            token,
+            status,
+            template_id,
+            created_at
+          )
+        `)
+        .eq('status', 'screening_test')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const normalized = ((data || []) as ScreeningCandidateSourceRow[]).map((row) => {
+        const invitationRaw = Array.isArray(row.screening_invitations)
+          ? [...row.screening_invitations].sort((a, b) =>
+              new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+            )[0]
+          : row.screening_invitations;
+
+        return {
+          application_id: row.id,
+          candidate_name:
+            `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Nieznany kandydat',
+          job_title: row.jobs?.title || 'Brak stanowiska',
+          status: row.status || 'unknown',
+          invitation: invitationRaw
+            ? {
+                id: invitationRaw.id,
+                token: invitationRaw.token,
+                status: invitationRaw.status,
+                template_id: invitationRaw.template_id,
+              }
+            : null,
+        } as ScreeningCandidateRow;
+      });
+
+      console.debug('[screening] candidates with invitations', normalized);
+      return normalized;
+    },
+  });
+
+  const generateTestMutation = useMutation({
+    mutationFn: async ({ applicationId }: { applicationId: string }) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('Brak aktywnej sesji użytkownika');
+
+      const response = await fetch('/api/hr/screening/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          application_id: applicationId,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Nie udało się wygenerować testu');
+      }
+
+      return payload;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['screening_candidates'] });
+      toast.success('Test został wygenerowany');
+    },
+    onError: (err: unknown) => {
+      toast.error(getErrorMessage(err, 'Nie udało się wygenerować testu'));
+    },
+  });
+
   // Fetch templates
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['screening_templates'],
     queryFn: async () => {
       const { data: tpls, error } = await supabase
         .from('screening_templates')
-        .select('*')
+        .select('id, name, description, is_global, job_id, created_by, created_at')
         .order('created_at', { ascending: false });
       if (error) throw error;
 
@@ -130,7 +274,7 @@ export default function Screening() {
         .select('template_id');
 
       const countMap: Record<string, number> = {};
-      (qCounts || []).forEach((q: any) => {
+      (qCounts || []).forEach((q: { template_id: string }) => {
         countMap[q.template_id] = (countMap[q.template_id] || 0) + 1;
       });
 
@@ -196,7 +340,7 @@ export default function Screening() {
     // Load existing questions
     const { data, error } = await supabase
       .from('screening_questions')
-      .select('*')
+      .select('id, skill_id, question, type, options, scale_min, scale_max, order_index')
       .eq('template_id', tpl.id)
       .order('order_index');
 
@@ -205,7 +349,7 @@ export default function Screening() {
       return;
     }
 
-    const loaded: LocalQuestion[] = (data || []).map((q: any) => ({
+    const loaded: LocalQuestion[] = ((data || []) as ScreeningQuestionRow[]).map((q) => ({
       localId: crypto.randomUUID(),
       id: q.id,
       skill_id: q.skill_id,
@@ -290,8 +434,8 @@ export default function Screening() {
       queryClient.invalidateQueries({ queryKey: ['screening_templates'] });
       toast.success(editingTemplate ? 'Szablon zaktualizowany' : 'Szablon utworzony');
       setSheetOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Nie udało się zapisać szablonu');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Nie udało się zapisać szablonu'));
     } finally {
       setSaving(false);
     }
@@ -374,6 +518,112 @@ export default function Screening() {
           Nowy szablon
         </Button>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Kandydaci w etapie screening_test</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {screeningCandidatesLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Ładowanie kandydatów i zaproszeń...
+            </div>
+          ) : screeningCandidatesError ? (
+            <div className="space-y-2 text-sm">
+              <p className="text-destructive font-medium">
+                Nie udało się pobrać kandydatów screeningowych.
+              </p>
+              <p className="text-muted-foreground break-all">
+                {getErrorMessage(
+                  screeningCandidatesErrorDetails,
+                  'Błąd pobierania danych'
+                )}
+              </p>
+            </div>
+          ) : screeningCandidates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Brak kandydatów ze statusem <code>screening_test</code>.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {screeningCandidates.map((candidate) => {
+                const hasInvitation = Boolean(candidate.invitation?.token);
+                const invitationLink = hasInvitation
+                  ? `${window.location.origin}/screening/${candidate.invitation!.token}`
+                  : null;
+
+                return (
+                  <div
+                    key={candidate.application_id}
+                    className="rounded-md border border-border p-3"
+                  >
+                    <div className="grid gap-2 md:grid-cols-[1.2fr_1fr_0.8fr_0.9fr_auto] md:items-center">
+                      <div>
+                        <p className="text-sm font-medium">{candidate.candidate_name}</p>
+                        <p className="text-xs text-muted-foreground">{candidate.job_title}</p>
+                      </div>
+
+                      <div>
+                        <Badge variant="outline">{candidate.status}</Badge>
+                      </div>
+
+                      <div>
+                        <Badge variant={hasInvitation ? 'secondary' : 'outline'}>
+                          {candidate.invitation?.status || 'brak zaproszenia'}
+                        </Badge>
+                      </div>
+
+                      <div className="min-w-0">
+                        {hasInvitation ? (
+                          <p className="truncate text-xs text-muted-foreground">
+                            Token: {candidate.invitation?.token}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Token: —</p>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        {hasInvitation ? (
+                          <>
+                            <Button asChild size="sm" variant="outline">
+                              <Link to={`/screening/${candidate.invitation!.token}`}>
+                                Otwórz test
+                              </Link>
+                            </Button>
+                            <Button asChild size="sm" variant="ghost">
+                              <a href={invitationLink!} target="_blank" rel="noreferrer">
+                                <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                                Link
+                              </a>
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              generateTestMutation.mutate({
+                                applicationId: candidate.application_id,
+                              })
+                            }
+                            disabled={generateTestMutation.isPending}
+                          >
+                            {generateTestMutation.isPending ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : null}
+                            Generuj test
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <div className="text-muted-foreground">Ładowanie...</div>
