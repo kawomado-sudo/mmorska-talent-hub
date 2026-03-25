@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { hrApi } from '@/lib/hr-api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -77,20 +78,11 @@ interface ScreeningCandidateRow {
 }
 
 interface ScreeningCandidateSourceRow {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  status: string | null;
-  jobs: { title: string | null } | null;
-  screening_invitations:
-    | Array<{
-        id: string;
-        token: string;
-        status: ScreeningInvitationRow['status'];
-        template_id: string | null;
-        created_at: string | null;
-      }>
-    | null;
+  application_id: string;
+  candidate_name: string;
+  job_title: string;
+  status: string;
+  invitation: ScreeningInvitationRow | null;
 }
 
 interface ScreeningQuestionRow {
@@ -172,52 +164,21 @@ export default function Screening() {
   } = useQuery({
     queryKey: ['screening_candidates'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('applications')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          status,
-          jobs:job_id (
-            title
-          ),
-          screening_invitations (
-            id,
-            token,
-            status,
-            template_id,
-            created_at
-          )
-        `)
-        .eq('status', 'screening_test')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const normalized = ((data || []) as ScreeningCandidateSourceRow[]).map((row) => {
-        const invitationRaw = Array.isArray(row.screening_invitations)
-          ? [...row.screening_invitations].sort((a, b) =>
-              new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-            )[0]
-          : row.screening_invitations;
-
-        return {
-          application_id: row.id,
-          candidate_name:
-            `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Nieznany kandydat',
-          job_title: row.jobs?.title || 'Brak stanowiska',
-          status: row.status || 'unknown',
-          invitation: invitationRaw
-            ? {
-                id: invitationRaw.id,
-                token: invitationRaw.token,
-                status: invitationRaw.status,
-                template_id: invitationRaw.template_id,
-              }
-            : null,
-        } as ScreeningCandidateRow;
-      });
+      const data = await hrApi<ScreeningCandidateSourceRow[]>('list_screening_candidates');
+      const normalized = (data || []).map((row) => ({
+        application_id: row.application_id,
+        candidate_name: row.candidate_name || 'Nieznany kandydat',
+        job_title: row.job_title || 'Brak stanowiska',
+        status: row.status || 'unknown',
+        invitation: row.invitation
+          ? {
+              id: row.invitation.id,
+              token: row.invitation.token,
+              status: row.invitation.status,
+              template_id: row.invitation.template_id,
+            }
+          : null,
+      })) as ScreeningCandidateRow[];
 
       console.debug('[screening] candidates with invitations', normalized);
       return normalized;

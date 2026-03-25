@@ -193,6 +193,64 @@ Deno.serve(async (req) => {
         return json(enriched);
       }
 
+      case "list_screening_candidates": {
+        const { data: candidates, error } = await db
+          .from("applications")
+          .select("id, first_name, last_name, status, job_id, created_at")
+          .eq("status", "screening_test")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+
+        const jobIds = [...new Set((candidates || []).map((candidate: any) => candidate.job_id).filter(Boolean))];
+        const appIds = (candidates || []).map((candidate: any) => candidate.id);
+
+        let jobTitleMap: Record<string, string> = {};
+        if (jobIds.length > 0) {
+          const { data: jobs, error: jobsError } = await db
+            .from("jobs")
+            .select("id, title")
+            .in("id", jobIds);
+          if (jobsError) throw jobsError;
+          jobTitleMap = Object.fromEntries((jobs || []).map((job: any) => [job.id, job.title || "Brak stanowiska"]));
+        }
+
+        let invitationMap: Record<string, any> = {};
+        if (appIds.length > 0) {
+          const { data: invitations, error: invError } = await db
+            .from("screening_invitations")
+            .select("id, application_id, token, status, template_id, created_at")
+            .in("application_id", appIds)
+            .order("created_at", { ascending: false });
+          if (invError) throw invError;
+
+          (invitations || []).forEach((invitation: any) => {
+            if (!invitationMap[invitation.application_id]) {
+              invitationMap[invitation.application_id] = invitation;
+            }
+          });
+        }
+
+        const normalized = (candidates || []).map((candidate: any) => {
+          const invitation = invitationMap[candidate.id];
+          return {
+            application_id: candidate.id,
+            candidate_name: `${candidate.first_name || ""} ${candidate.last_name || ""}`.trim() || "Nieznany kandydat",
+            job_title: candidate.job_id ? (jobTitleMap[candidate.job_id] || "Brak stanowiska") : "Brak stanowiska",
+            status: candidate.status || "unknown",
+            invitation: invitation
+              ? {
+                  id: invitation.id,
+                  token: invitation.token,
+                  status: invitation.status,
+                  template_id: invitation.template_id,
+                }
+              : null,
+          };
+        });
+
+        return json(normalized);
+      }
+
       case "get_application": {
         const { data, error } = await db
           .from("applications")
