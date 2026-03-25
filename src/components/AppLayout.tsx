@@ -10,6 +10,7 @@ export const AppLayout = () => {
     { to: '/jobs', label: 'Ogłoszenia', icon: Briefcase, visible: true },
     { to: '/skills', label: 'Skille', icon: Sparkles, visible: isAdmin },
     { to: '/screening', label: 'Testy', icon: ClipboardList, visible: isAdmin },
+    { to: '/screening/results', label: 'Wyniki', icon: ClipboardList, visible: isAdmin },
     { to: '/settings', label: 'Ustawienia', icon: Settings, visible: isAdmin },
   ].filter((item) => item.visible);
 

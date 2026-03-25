@@ -67,6 +67,7 @@ interface ScreeningInvitationRow {
   token: string;
   status: 'pending' | 'started' | 'completed' | 'expired';
   template_id: string | null;
+  expires_at?: string | null;
 }
 
 interface ScreeningCandidateRow {
@@ -100,6 +101,40 @@ const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
 type QuestionType = 'single' | 'multi' | 'text' | 'scale';
+type TemplateLanguage = 'pl' | 'en';
+
+function parseTemplateDescription(raw: string | null): { language: TemplateLanguage; description: string } {
+  if (!raw) {
+    return { language: 'pl', description: '' };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { lang?: string; desc?: string };
+    return {
+      language: parsed.lang === 'en' ? 'en' : 'pl',
+      description: typeof parsed.desc === 'string' ? parsed.desc : '',
+    };
+  } catch {
+    return { language: 'pl', description: raw };
+  }
+}
+
+function stringifyTemplateDescription(description: string, language: TemplateLanguage): string {
+  return JSON.stringify({
+    lang: language,
+    desc: description.trim(),
+  });
+}
+
+const invitationStatusBadge: Record<
+  ScreeningInvitationRow['status'],
+  { label: string; className: string }
+> = {
+  pending: { label: 'Nie rozpoczął', className: 'bg-muted text-muted-foreground border-border' },
+  started: { label: 'W trakcie', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  completed: { label: 'Wypełniony', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  expired: { label: 'Wygasło', className: 'bg-red-100 text-red-700 border-red-200' },
+};
 
 interface QuestionOption {
   text: string;
@@ -151,6 +186,7 @@ export default function Screening() {
   // Template form state
   const [tplName, setTplName] = useState('');
   const [tplDescription, setTplDescription] = useState('');
+  const [tplLanguage, setTplLanguage] = useState<TemplateLanguage>('pl');
   const [tplIsGlobal, setTplIsGlobal] = useState(true);
   const [questions, setQuestions] = useState<LocalQuestion[]>([]);
   const [saving, setSaving] = useState(false);
@@ -176,6 +212,7 @@ export default function Screening() {
               token: row.invitation.token,
               status: row.invitation.status,
               template_id: row.invitation.template_id,
+              expires_at: row.invitation.expires_at,
             }
           : null,
       })) as ScreeningCandidateRow[];
@@ -287,6 +324,7 @@ export default function Screening() {
     setEditingTemplate(null);
     setTplName('');
     setTplDescription('');
+    setTplLanguage('pl');
     setTplIsGlobal(true);
     setQuestions([newLocalQuestion(0)]);
     setSheetOpen(true);
@@ -294,8 +332,10 @@ export default function Screening() {
 
   const openEdit = async (tpl: ScreeningTemplate) => {
     setEditingTemplate(tpl);
+    const parsedDescription = parseTemplateDescription(tpl.description);
     setTplName(tpl.name);
-    setTplDescription(tpl.description || '');
+    setTplDescription(parsedDescription.description);
+    setTplLanguage(parsedDescription.language);
     setTplIsGlobal(tpl.is_global);
 
     // Load existing questions
@@ -342,7 +382,7 @@ export default function Screening() {
           .from('screening_templates')
           .update({
             name: tplName.trim(),
-            description: tplDescription.trim() || null,
+            description: stringifyTemplateDescription(tplDescription, tplLanguage),
             is_global: tplIsGlobal,
           })
           .eq('id', editingTemplate.id);
@@ -359,7 +399,7 @@ export default function Screening() {
           .from('screening_templates')
           .insert({
             name: tplName.trim(),
-            description: tplDescription.trim() || null,
+            description: stringifyTemplateDescription(tplDescription, tplLanguage),
             is_global: tplIsGlobal,
             job_id: null,
           })
@@ -530,9 +570,20 @@ export default function Screening() {
                       </div>
 
                       <div>
-                        <Badge variant={hasInvitation ? 'secondary' : 'outline'}>
-                          {candidate.invitation?.status || 'brak zaproszenia'}
-                        </Badge>
+                        {candidate.invitation ? (
+                          <Badge className={invitationStatusBadge[candidate.invitation.status].className}>
+                            {invitationStatusBadge[candidate.invitation.status].label}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">brak zaproszenia</Badge>
+                        )}
+                        {candidate.invitation?.expires_at &&
+                        (candidate.invitation.status === 'pending' ||
+                          candidate.invitation.status === 'started') ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Wygasa: {new Date(candidate.invitation.expires_at).toLocaleString('pl-PL')}
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="min-w-0">
@@ -599,12 +650,14 @@ export default function Screening() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {templates.map((tpl) => (
-            <Card
-              key={tpl.id}
-              className="cursor-pointer transition-colors hover:border-primary/40"
-              onClick={() => openEdit(tpl)}
-            >
+          {templates.map((tpl) => {
+            const parsedTemplateDescription = parseTemplateDescription(tpl.description);
+            return (
+              <Card
+                key={tpl.id}
+                className="cursor-pointer transition-colors hover:border-primary/40"
+                onClick={() => openEdit(tpl)}
+              >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base leading-snug">{tpl.name}</CardTitle>
@@ -617,11 +670,14 @@ export default function Screening() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 pb-3">
-                {tpl.description && (
+                {parsedTemplateDescription.description && (
                   <p className="text-xs text-muted-foreground line-clamp-2">
-                    {tpl.description}
+                    {parsedTemplateDescription.description}
                   </p>
                 )}
+                <Badge variant="outline" className="w-fit text-xs">
+                  {parsedTemplateDescription.language === 'en' ? 'English' : 'Polski'}
+                </Badge>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <ClipboardList className="h-3.5 w-3.5" />
                   {tpl.question_count}{' '}
@@ -644,7 +700,7 @@ export default function Screening() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )})}
         </div>
       )}
 
@@ -676,6 +732,21 @@ export default function Screening() {
                     placeholder="Krótki opis testu..."
                     rows={2}
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Język testu</Label>
+                  <Select
+                    value={tplLanguage}
+                    onValueChange={(value) => setTplLanguage(value as TemplateLanguage)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pl">Polski</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex items-center gap-3">
                   <Switch
