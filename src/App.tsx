@@ -12,6 +12,7 @@ import Applications from "./pages/Applications";
 import SettingsPage from "./pages/SettingsPage";
 import Skills from "./pages/Skills";
 import Screening from "./pages/Screening";
+import ScreeningResults from "./pages/ScreeningResults";
 import TestPage from "./pages/TestPage";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/jobs/:jobId/applications" element={<Applications />} />
               <Route path="/skills" element={<Skills />} />
               <Route path="/screening" element={<Screening />} />
+              <Route path="/screening/results" element={<ScreeningResults />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />

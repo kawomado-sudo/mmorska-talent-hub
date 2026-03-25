@@ -18,6 +18,23 @@ const supabasePublicHr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 type InvitationStatus = 'pending' | 'started' | 'completed' | 'expired';
 type QuestionType = 'single' | 'multi' | 'text' | 'scale';
+type TemplateLanguage = 'pl' | 'en';
+
+const uiLabels: Record<TemplateLanguage, { submit: string; next: string; thankYou: string }> = {
+  pl: { submit: 'Wyślij test', next: 'Dalej', thankYou: 'Dziękujemy' },
+  en: { submit: 'Submit test', next: 'Next', thankYou: 'Thank you' },
+};
+
+function getLanguageFromDescription(raw: string | null): TemplateLanguage {
+  if (!raw) return 'pl';
+
+  try {
+    const parsed = JSON.parse(raw) as { lang?: string };
+    return parsed.lang === 'en' ? 'en' : 'pl';
+  } catch {
+    return 'pl';
+  }
+}
 
 interface ScreeningInvitation {
   id: string;
@@ -51,6 +68,7 @@ export default function TestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [language, setLanguage] = useState<TemplateLanguage>('pl');
 
   useEffect(() => {
     const loadTest = async () => {
@@ -83,6 +101,14 @@ export default function TestPage() {
 
       setInvitation(invitationData as ScreeningInvitation);
 
+      const { data: templateData } = await supabasePublicHr
+        .from('screening_templates')
+        .select('description')
+        .eq('id', invitationData.template_id)
+        .maybeSingle();
+
+      setLanguage(getLanguageFromDescription(templateData?.description || null));
+
       const { data: questionsData, error: questionsError } = await supabasePublicHr
         .from('screening_questions')
         .select('id, question, type, options, scale_min, scale_max, order_index')
@@ -102,6 +128,7 @@ export default function TestPage() {
   }, [token]);
 
   const isCompleted = useMemo(() => invitation?.status === 'completed', [invitation]);
+  const labels = uiLabels[language];
 
   const setTextAnswer = (questionId: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
@@ -210,12 +237,12 @@ export default function TestPage() {
             <CardHeader>
               <CardTitle>Test już wypełniony</CardTitle>
             </CardHeader>
-            <CardContent>Dziękujemy za przesłane odpowiedzi.</CardContent>
+            <CardContent>{labels.thankYou} za przesłane odpowiedzi.</CardContent>
           </Card>
         ) : isSuccess ? (
           <Card>
             <CardHeader>
-              <CardTitle>Dziękujemy za wypełnienie testu!</CardTitle>
+              <CardTitle>{labels.thankYou} za wypełnienie testu!</CardTitle>
             </CardHeader>
             <CardContent>Twoje odpowiedzi zostały zapisane.</CardContent>
           </Card>
@@ -236,7 +263,11 @@ export default function TestPage() {
                   );
 
                   return (
-                    <div key={q.id} className="space-y-3 border-b border-slate-200 pb-6 last:border-none">
+                    <div
+                      key={q.id}
+                      data-question-id={q.id}
+                      className="space-y-3 border-b border-slate-200 pb-6 last:border-none"
+                    >
                       <Label className="text-base font-semibold">
                         {index + 1}. {q.question}
                       </Label>
@@ -245,7 +276,7 @@ export default function TestPage() {
                         <Textarea
                           value={typeof answers[q.id] === 'string' ? (answers[q.id] as string) : ''}
                           onChange={(e) => setTextAnswer(q.id, e.target.value)}
-                          placeholder="Wpisz swoją odpowiedź"
+                          placeholder={language === 'en' ? 'Type your answer' : 'Wpisz swoją odpowiedź'}
                         />
                       ) : null}
 
@@ -305,6 +336,21 @@ export default function TestPage() {
                           ))}
                         </div>
                       ) : null}
+                    {index < questions.length - 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="px-0 text-xs"
+                        onClick={() =>
+                          document
+                            .querySelectorAll('[data-question-id]')
+                            [index + 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }
+                      >
+                        {labels.next}
+                      </Button>
+                    ) : null}
                     </div>
                   );
                 })}
@@ -313,10 +359,10 @@ export default function TestPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Wysyłanie...
+                      {language === 'en' ? 'Submitting...' : 'Wysyłanie...'}
                     </>
                   ) : (
-                    'Wyślij'
+                    labels.submit
                   )}
                 </Button>
               </form>

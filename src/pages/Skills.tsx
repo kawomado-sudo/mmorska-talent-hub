@@ -8,13 +8,26 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SkillCategory {
@@ -30,6 +43,13 @@ interface Skill {
   name: string;
   description: string | null;
   created_at: string;
+}
+
+interface JobSkillViewRow {
+  id: string;
+  moscow_priority: string | null;
+  skill: { name: string; category: { name: string } | null } | null;
+  job: { title: string } | null;
 }
 
 const PRESET_COLORS = [
@@ -53,6 +73,7 @@ export default function Skills() {
   const [skillCategoryId, setSkillCategoryId] = useState('');
   const [skillName, setSkillName] = useState('');
   const [skillDescription, setSkillDescription] = useState('');
+  const [openJobs, setOpenJobs] = useState<Record<string, boolean>>({});
 
   // Fetch categories
   const { data: categories = [], isLoading: catsLoading } = useQuery({
@@ -60,7 +81,7 @@ export default function Skills() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('skill_categories')
-        .select('*')
+        .select('id, name, color, created_at')
         .order('name');
       if (error) throw error;
       return data as SkillCategory[];
@@ -73,10 +94,22 @@ export default function Skills() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('skills')
-        .select('*')
+        .select('id, category_id, name, description, created_at')
         .order('name');
       if (error) throw error;
       return data as Skill[];
+    },
+  });
+
+  const { data: jobSkillRows = [], isLoading: jobSkillsLoading } = useQuery({
+    queryKey: ['job_skills_view'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_skills')
+        .select('id, moscow_priority, skill:skills(name, category:skill_categories(name)), job:jobs(title)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as unknown as JobSkillViewRow[];
     },
   });
 
@@ -192,6 +225,23 @@ export default function Skills() {
   };
 
   const isLoading = catsLoading || skillsLoading;
+  const groupedJobSkills = jobSkillRows.reduce<Record<string, JobSkillViewRow[]>>((acc, row) => {
+    const jobTitle = row.job?.title || 'Bez przypisanego ogłoszenia';
+    if (!acc[jobTitle]) acc[jobTitle] = [];
+    acc[jobTitle].push(row);
+    return acc;
+  }, {});
+
+  const getMoscowBadge = (value: string | null) => {
+    const normalized = (value || '').toLowerCase();
+    if (normalized === 'must') return <Badge className="bg-red-100 text-red-700 border-red-200">Must</Badge>;
+    if (normalized === 'should') return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Should</Badge>;
+    if (normalized === 'could') return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Could</Badge>;
+    if (normalized === "won't" || normalized === 'wont') {
+      return <Badge className="bg-muted text-muted-foreground border-border">Won't</Badge>;
+    }
+    return <Badge variant="outline">{value || '—'}</Badge>;
+  };
 
   return (
     <div className="p-6">
@@ -201,6 +251,55 @@ export default function Skills() {
           <Plus className="mr-2 h-4 w-4" />
           Nowa kategoria
         </Button>
+      </div>
+
+      <div className="mb-8 rounded-lg border border-border bg-card p-4">
+        <h2 className="mb-3 text-lg font-semibold">Skille przypisane do stanowisk</h2>
+        {jobSkillsLoading ? (
+          <p className="text-sm text-muted-foreground">Ładowanie przypisań...</p>
+        ) : Object.keys(groupedJobSkills).length === 0 ? (
+          <p className="text-sm text-muted-foreground">Brak przypisanych skilli do ogłoszeń.</p>
+        ) : (
+          <div className="space-y-2">
+            {Object.entries(groupedJobSkills).map(([jobTitle, rows]) => (
+              <Collapsible
+                key={jobTitle}
+                open={openJobs[jobTitle] ?? true}
+                onOpenChange={(open) => setOpenJobs((prev) => ({ ...prev, [jobTitle]: open }))}
+                className="rounded-md border border-border"
+              >
+                <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-muted/40">
+                  <span className="text-sm font-medium">{jobTitle}</span>
+                  {openJobs[jobTitle] ?? true ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Skill</TableHead>
+                        <TableHead>Kategoria</TableHead>
+                        <TableHead>MoSCoW</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium">{row.skill?.name || '—'}</TableCell>
+                          <TableCell>{row.skill?.category?.name || '—'}</TableCell>
+                          <TableCell>{getMoscowBadge(row.moscow_priority)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
+          </div>
+        )}
       </div>
 
       {isLoading ? (
