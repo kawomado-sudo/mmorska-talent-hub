@@ -12,6 +12,7 @@ import Applications from "./pages/Applications";
 import SettingsPage from "./pages/SettingsPage";
 import Skills from "./pages/Skills";
 import Screening from "./pages/Screening";
+import TestPage from "./pages/TestPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Navigate to="/jobs" replace />} />
+            <Route path="/test/:token" element={<TestPage />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/jobs/:jobId/applications" element={<Applications />} />

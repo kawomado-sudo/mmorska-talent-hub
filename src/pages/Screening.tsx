@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseAuth } from '@/integrations/supabase/client';
 import { hrApi } from '@/lib/hr-api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -189,10 +189,10 @@ export default function Screening() {
     mutationFn: async ({ applicationId }: { applicationId: string }) => {
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await supabaseAuth.auth.getSession();
       if (!session) throw new Error('Brak aktywnej sesji użytkownika');
 
-      const response = await fetch('/api/hr/screening/generate', {
+      const response = await fetch('https://opdpjplccytlzadjpdsd.supabase.co/functions/v1/hr-screening-generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -511,7 +511,7 @@ export default function Screening() {
               {screeningCandidates.map((candidate) => {
                 const hasInvitation = Boolean(candidate.invitation?.token);
                 const invitationLink = hasInvitation
-                  ? `${window.location.origin}/screening/${candidate.invitation!.token}`
+                  ? `${window.location.origin}/test/${candidate.invitation!.token}`
                   : null;
 
                 return (
@@ -537,9 +537,14 @@ export default function Screening() {
 
                       <div className="min-w-0">
                         {hasInvitation ? (
-                          <p className="truncate text-xs text-muted-foreground">
-                            Token: {candidate.invitation?.token}
-                          </p>
+                          <a
+                            className="truncate text-xs text-primary underline-offset-2 hover:underline"
+                            href={`/test/${candidate.invitation?.token}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Podgląd testu
+                          </a>
                         ) : (
                           <p className="text-xs text-muted-foreground">Token: —</p>
                         )}
@@ -549,7 +554,7 @@ export default function Screening() {
                         {hasInvitation ? (
                           <>
                             <Button asChild size="sm" variant="outline">
-                              <Link to={`/screening/${candidate.invitation!.token}`}>
+                              <Link to={`/test/${candidate.invitation!.token}`} target="_blank" rel="noreferrer">
                                 Otwórz test
                               </Link>
                             </Button>
