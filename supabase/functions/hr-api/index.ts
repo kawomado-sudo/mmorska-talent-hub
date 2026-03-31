@@ -1,10 +1,22 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+declare const EdgeRuntime:
+  | { waitUntil: (promise: Promise<unknown>) => void }
+  | undefined;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+function runAfterResponse(promise: Promise<unknown>) {
+  if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+    EdgeRuntime.waitUntil(promise);
+  } else {
+    promise.catch((err) => console.error("Background task error:", err));
+  }
+}
 
 const ADMIN_EMAILS = ['support@mmorska.pl', 'dobrochna.mankowska@mmorska.pl'];
 
@@ -63,43 +75,45 @@ Deno.serve(async (req) => {
           .order("created_at", { ascending: false });
         if (error) throw error;
 
-        const { data: apps, error: appErr } = await db
-          .from("applications")
-          .select("job_id, assigned_reviewer_id");
-        if (appErr) throw appErr;
+        const { data: statsRows, error: statsErr } = await db.rpc("job_application_stats");
+        if (statsErr) throw statsErr;
 
         const countMap: Record<string, number> = {};
         const reviewerIdsPerJob: Record<string, Set<string>> = {};
-        apps?.forEach((a: any) => {
-          countMap[a.job_id] = (countMap[a.job_id] || 0) + 1;
-          if (a.assigned_reviewer_id) {
-            if (!reviewerIdsPerJob[a.job_id]) reviewerIdsPerJob[a.job_id] = new Set();
-            reviewerIdsPerJob[a.job_id].add(a.assigned_reviewer_id);
-          }
+        (statsRows as { job_id: string; application_count: number; reviewer_ids: string[] | null }[] | null)?.forEach((row) => {
+          countMap[row.job_id] = Number(row.application_count) || 0;
+          const ids = row.reviewer_ids?.filter(Boolean) ?? [];
+          reviewerIdsPerJob[row.job_id] = new Set(ids);
         });
 
         const allReviewerIds = new Set<string>();
         Object.values(reviewerIdsPerJob).forEach(s => s.forEach(id => allReviewerIds.add(id)));
 
-        let reviewerNameMap: Record<string, string> = {};
+        const reviewerNameMap: Record<string, string> = {};
         if (allReviewerIds.size > 0) {
           const ids = Array.from(allReviewerIds);
           const { data: members } = await dbPublic
             .from("team_members_public")
             .select("id, auth_user_id, full_name, first_name, last_name")
             .or(ids.map(id => `id.eq.${id}`).concat(ids.map(id => `auth_user_id.eq.${id}`)).join(","));
-          members?.forEach((m: any) => {
-            const name = m.full_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || "?";
-            if (m.id) reviewerNameMap[m.id] = name;
-            if (m.auth_user_id) reviewerNameMap[m.auth_user_id] = name;
+          members?.forEach((m: Record<string, unknown>) => {
+            const name =
+              (m.full_name as string) ||
+              [m.first_name, m.last_name].filter(Boolean).join(" ") ||
+              "?";
+            const mid = m.id as string | undefined;
+            const aid = m.auth_user_id as string | undefined;
+            if (mid) reviewerNameMap[mid] = name;
+            if (aid) reviewerNameMap[aid] = name;
           });
         }
 
         return json(
-          jobs.map((j: any) => {
-            const reviewerIds = reviewerIdsPerJob[j.id] ? Array.from(reviewerIdsPerJob[j.id]) : [];
+          jobs.map((j: Record<string, unknown>) => {
+            const jid = j.id as string;
+            const reviewerIds = reviewerIdsPerJob[jid] ? Array.from(reviewerIdsPerJob[jid]) : [];
             const reviewers = [...new Set(reviewerIds.map((id: string) => reviewerNameMap[id]).filter(Boolean))];
-            return { ...j, application_count: countMap[j.id] || 0, reviewers };
+            return { ...j, application_count: countMap[jid] || 0, reviewers };
           })
         );
       }
@@ -171,24 +185,39 @@ Deno.serve(async (req) => {
         if (error) throw error;
 
         // Resolve reviewer names
-        const reviewerIds = [...new Set((data || []).filter((a: any) => a.assigned_reviewer_id).map((a: any) => a.assigned_reviewer_id))];
-        let reviewerNameMap: Record<string, string> = {};
+        const rows = (data || []) as Record<string, unknown>[];
+        const reviewerIds = [
+          ...new Set(
+            rows
+              .filter((a) => a.assigned_reviewer_id)
+              .map((a) => String(a.assigned_reviewer_id)),
+          ),
+        ];
+        const reviewerNameMap: Record<string, string> = {};
         if (reviewerIds.length > 0) {
           const { data: members } = await dbPublic
             .from("team_members_public")
             .select("id, auth_user_id, full_name, first_name, last_name")
             .or(reviewerIds.map((id: string) => `id.eq.${id}`).concat(reviewerIds.map((id: string) => `auth_user_id.eq.${id}`)).join(","));
-          members?.forEach((m: any) => {
-            const name = m.full_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || "?";
-            if (m.id) reviewerNameMap[m.id] = name;
-            if (m.auth_user_id) reviewerNameMap[m.auth_user_id] = name;
+          members?.forEach((m: Record<string, unknown>) => {
+            const name =
+              (m.full_name as string) ||
+              [m.first_name, m.last_name].filter(Boolean).join(" ") ||
+              "?";
+            const mid = m.id as string | undefined;
+            const aid = m.auth_user_id as string | undefined;
+            if (mid) reviewerNameMap[mid] = name;
+            if (aid) reviewerNameMap[aid] = name;
           });
         }
 
-        const enriched = (data || []).map((a: any) => ({
-          ...a,
-          reviewer_name: a.assigned_reviewer_id ? (reviewerNameMap[a.assigned_reviewer_id] || null) : null,
-        }));
+        const enriched = rows.map((a) => {
+          const rid = a.assigned_reviewer_id ? String(a.assigned_reviewer_id) : null;
+          return {
+            ...a,
+            reviewer_name: rid ? (reviewerNameMap[rid] || null) : null,
+          };
+        });
 
         return json(enriched);
       }
@@ -201,8 +230,9 @@ Deno.serve(async (req) => {
           .order("created_at", { ascending: false });
         if (error) throw error;
 
-        const jobIds = [...new Set((candidates || []).map((candidate: any) => candidate.job_id).filter(Boolean))];
-        const appIds = (candidates || []).map((candidate: any) => candidate.id);
+        const candRows = (candidates || []) as Record<string, unknown>[];
+        const jobIds = [...new Set(candRows.map((c) => c.job_id).filter(Boolean).map(String))];
+        const appIds = candRows.map((c) => String(c.id));
 
         let jobTitleMap: Record<string, string> = {};
         if (jobIds.length > 0) {
@@ -211,10 +241,15 @@ Deno.serve(async (req) => {
             .select("id, title")
             .in("id", jobIds);
           if (jobsError) throw jobsError;
-          jobTitleMap = Object.fromEntries((jobs || []).map((job: any) => [job.id, job.title || "Brak stanowiska"]));
+          jobTitleMap = Object.fromEntries(
+            ((jobs || []) as Record<string, unknown>[]).map((job) => [
+              String(job.id),
+              (job.title as string) || "Brak stanowiska",
+            ]),
+          );
         }
 
-        let invitationMap: Record<string, any> = {};
+        const invitationMap: Record<string, Record<string, unknown>> = {};
         if (appIds.length > 0) {
           const { data: invitations, error: invError } = await db
             .from("screening_invitations")
@@ -223,20 +258,23 @@ Deno.serve(async (req) => {
             .order("created_at", { ascending: false });
           if (invError) throw invError;
 
-          (invitations || []).forEach((invitation: any) => {
-            if (!invitationMap[invitation.application_id]) {
-              invitationMap[invitation.application_id] = invitation;
-            }
+          ((invitations || []) as Record<string, unknown>[]).forEach((invitation) => {
+            const aid = String(invitation.application_id);
+            if (!invitationMap[aid]) invitationMap[aid] = invitation;
           });
         }
 
-        const normalized = (candidates || []).map((candidate: any) => {
-          const invitation = invitationMap[candidate.id];
+        const normalized = candRows.map((candidate) => {
+          const cid = String(candidate.id);
+          const invitation = invitationMap[cid];
           return {
-            application_id: candidate.id,
-            candidate_name: `${candidate.first_name || ""} ${candidate.last_name || ""}`.trim() || "Nieznany kandydat",
-            job_title: candidate.job_id ? (jobTitleMap[candidate.job_id] || "Brak stanowiska") : "Brak stanowiska",
-            status: candidate.status || "unknown",
+            application_id: cid,
+            candidate_name:
+              `${candidate.first_name || ""} ${candidate.last_name || ""}`.trim() || "Nieznany kandydat",
+            job_title: candidate.job_id
+              ? (jobTitleMap[String(candidate.job_id)] || "Brak stanowiska")
+              : "Brak stanowiska",
+            status: (candidate.status as string) || "unknown",
             invitation: invitation
               ? {
                   id: invitation.id,
@@ -393,18 +431,20 @@ Deno.serve(async (req) => {
           .eq("id", app.job_id)
           .single();
 
-        // Send email notification to reviewer
+        // Send email after HTTP response so the client is not blocked on Maileroo latency
         const mailerooKey = Deno.env.get("MAILEROO_API_KEY");
         if (mailerooKey && member.email) {
-          try {
-            const maskHalf = (s: string) => {
-              if (!s) return '';
-              const half = Math.ceil(s.length / 2);
-              return s.slice(0, half) + '•'.repeat(s.length - half);
-            };
-            const maskedName = `${maskHalf(app.first_name || '')} ${maskHalf(app.last_name || '')}`.trim();
-            const jobTitle = job?.title || 'Nieznane stanowisko';
-            await fetch("https://smtp.maileroo.com/api/v2/emails", {
+          const maskHalf = (s: string) => {
+            if (!s) return "";
+            const half = Math.ceil(s.length / 2);
+            return s.slice(0, half) + "•".repeat(s.length - half);
+          };
+          const maskedName = `${maskHalf(app.first_name || "")} ${maskHalf(app.last_name || "")}`.trim();
+          const jobTitle = job?.title || "Nieznane stanowisko";
+          const recipientEmail = member.email;
+          const recipientName = member.full_name || "";
+          runAfterResponse(
+            fetch("https://smtp.maileroo.com/api/v2/emails", {
               method: "POST",
               headers: {
                 "X-API-Key": mailerooKey,
@@ -412,7 +452,7 @@ Deno.serve(async (req) => {
               },
               body: JSON.stringify({
                 from: { address: "app.assistant@mmorska.eu", display_name: "MMorska Rekrutacja" },
-                to: [{ address: member.email, display_name: member.full_name || "" }],
+                to: [{ address: recipientEmail, display_name: recipientName }],
                 subject: `Nowe zadanie: ocena kandydata — ${maskedName}`,
                 html: `
                    <h2>Zostałeś przypisany jako recenzent</h2>
@@ -423,10 +463,10 @@ Deno.serve(async (req) => {
                    <p style="color:#888;font-size:12px;">MMorska — Panel Rekrutacyjny</p>
                  `,
               }),
-            });
-          } catch (emailErr) {
-            console.error("Failed to send reviewer notification email:", emailErr);
-          }
+            }).catch((emailErr) => {
+              console.error("Failed to send reviewer notification email:", emailErr);
+            }),
+          );
         }
 
         return json({ ok: true });
@@ -538,38 +578,41 @@ Deno.serve(async (req) => {
 
         const decisionLabel = status === 'accepted' ? '✅ Zaakceptowany' : '❌ Odrzucony';
 
-        // Send email to admins
         const mailerooKey = Deno.env.get("MAILEROO_API_KEY");
         if (mailerooKey) {
-          for (const adminEmail of ADMIN_EMAILS) {
-            try {
-              await fetch("https://smtp.maileroo.com/api/v2/emails", {
-                method: "POST",
-                headers: {
-                  "X-API-Key": mailerooKey,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  from: { address: "app.assistant@mmorska.eu", display_name: "MMorska Rekrutacja" },
-                  to: [{ address: adminEmail }],
-                  subject: `Recenzja: ${maskedName} — ${decisionLabel}`,
-                  html: `
+          runAfterResponse(
+            (async () => {
+              for (const adminEmail of ADMIN_EMAILS) {
+                try {
+                  await fetch("https://smtp.maileroo.com/api/v2/emails", {
+                    method: "POST",
+                    headers: {
+                      "X-API-Key": mailerooKey,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      from: { address: "app.assistant@mmorska.eu", display_name: "MMorska Rekrutacja" },
+                      to: [{ address: adminEmail }],
+                      subject: `Recenzja: ${maskedName} — ${decisionLabel}`,
+                      html: `
                     <h2>Nowa recenzja kandydata</h2>
                     <p><strong>Recenzent:</strong> ${reviewerName}</p>
                     <p><strong>Kandydat:</strong> ${maskedName}</p>
                     <p><strong>Stanowisko:</strong> ${jobTitle}</p>
                     <p><strong>Decyzja:</strong> ${decisionLabel}</p>
-                    ${notes ? `<p><strong>Notatka:</strong></p><blockquote style="border-left:3px solid #ccc;padding-left:12px;color:#555;">${notes}</blockquote>` : ''}
+                    ${notes ? `<p><strong>Notatka:</strong></p><blockquote style="border-left:3px solid #ccc;padding-left:12px;color:#555;">${notes}</blockquote>` : ""}
                     <br/>
                     <p>Przejdź do <a href="https://praca.mmorska.eu" style="color:#2563eb;">panelu rekrutacyjnego</a> aby zobaczyć szczegóły.</p>
                     <p style="color:#888;font-size:12px;">MMorska — Panel Rekrutacyjny</p>
                   `,
-                }),
-              });
-            } catch (emailErr) {
-              console.error("Failed to send admin review notification:", emailErr);
-            }
-          }
+                    }),
+                  });
+                } catch (emailErr) {
+                  console.error("Failed to send admin review notification:", emailErr);
+                }
+              }
+            })(),
+          );
         }
 
         return json({ ok: true });
@@ -659,8 +702,9 @@ Deno.serve(async (req) => {
       default:
         return json({ error: `Unknown action: ${action}` }, 400);
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("hr-api error:", err);
-    return json({ error: err.message }, 500);
+    const message = err instanceof Error ? err.message : String(err);
+    return json({ error: message }, 500);
   }
 });
