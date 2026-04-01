@@ -50,7 +50,7 @@ const SettingsPage = () => {
   // Team members (for adding new reviewers)
   const { data: teamMembers } = useQuery({
     queryKey: ['team-members'],
-    queryFn: () => hrApi('list_team_members'),
+    queryFn: () => hrApi<any[]>('list_team_members'),
   });
 
   useEffect(() => {
