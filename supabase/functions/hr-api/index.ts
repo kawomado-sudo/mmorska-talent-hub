@@ -75,15 +75,31 @@ Deno.serve(async (req) => {
           .order("created_at", { ascending: false });
         if (error) throw error;
 
-        const { data: statsRows, error: statsErr } = await db.rpc("job_application_stats");
-        if (statsErr) throw statsErr;
+        const jobRows = (jobs || []) as Record<string, unknown>[];
+        if (jobRows.length === 0) {
+          return json([]);
+        }
+
+        const jobIds = jobRows.map((job) => String(job.id));
+        const { data: applications, error: applicationsError } = await db
+          .from("applications")
+          .select("job_id, assigned_reviewer_id")
+          .in("job_id", jobIds);
+        if (applicationsError) throw applicationsError;
 
         const countMap: Record<string, number> = {};
         const reviewerIdsPerJob: Record<string, Set<string>> = {};
-        (statsRows as { job_id: string; application_count: number; reviewer_ids: string[] | null }[] | null)?.forEach((row) => {
-          countMap[row.job_id] = Number(row.application_count) || 0;
-          const ids = row.reviewer_ids?.filter(Boolean) ?? [];
-          reviewerIdsPerJob[row.job_id] = new Set(ids);
+        ((applications || []) as { job_id: string | null; assigned_reviewer_id: string | null }[]).forEach((row) => {
+          if (!row.job_id) return;
+
+          countMap[row.job_id] = (countMap[row.job_id] || 0) + 1;
+
+          if (row.assigned_reviewer_id) {
+            if (!reviewerIdsPerJob[row.job_id]) {
+              reviewerIdsPerJob[row.job_id] = new Set<string>();
+            }
+            reviewerIdsPerJob[row.job_id].add(row.assigned_reviewer_id);
+          }
         });
 
         const allReviewerIds = new Set<string>();
@@ -109,7 +125,7 @@ Deno.serve(async (req) => {
         }
 
         return json(
-          jobs.map((j: Record<string, unknown>) => {
+          jobRows.map((j: Record<string, unknown>) => {
             const jid = j.id as string;
             const reviewerIds = reviewerIdsPerJob[jid] ? Array.from(reviewerIdsPerJob[jid]) : [];
             const reviewers = [...new Set(reviewerIds.map((id: string) => reviewerNameMap[id]).filter(Boolean))];
