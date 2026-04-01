@@ -68,7 +68,7 @@ const Applications = () => {
 
   const { data: job } = useQuery({
     queryKey: ['job', jobId],
-    queryFn: () => hrApi('get_job', { id: jobId }),
+    queryFn: () => hrApi<{ title: string }>('get_job', { id: jobId }),
   });
 
   const { data: applications, isLoading, isError } = useQuery({
