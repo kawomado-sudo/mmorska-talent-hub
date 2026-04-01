@@ -44,7 +44,7 @@ const SettingsPage = () => {
   // Reviewers
   const { data: reviewers, isLoading: reviewersLoading } = useQuery({
     queryKey: ['reviewers'],
-    queryFn: () => hrApi('list_reviewers'),
+    queryFn: () => hrApi<any[]>('list_reviewers'),
   });
 
   // Team members (for adding new reviewers)
