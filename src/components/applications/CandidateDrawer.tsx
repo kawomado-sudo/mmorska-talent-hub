@@ -74,13 +74,13 @@ export const CandidateDrawer = ({ application, onClose, jobId, onDelete }: Candi
 
   const { data: statusHistory } = useQuery({
     queryKey: ['status-history', application?.id],
-    queryFn: () => hrApi('list_status_log', { application_id: application.id }),
+    queryFn: () => hrApi<any[]>('list_status_log', { application_id: application.id }),
     enabled: !!application,
   });
 
   const { data: teamMembers } = useQuery({
     queryKey: ['team-members'],
-    queryFn: () => hrApi('list_team_members'),
+    queryFn: () => hrApi<any[]>('list_team_members'),
     enabled: !!application && !isReviewer,
   });
 

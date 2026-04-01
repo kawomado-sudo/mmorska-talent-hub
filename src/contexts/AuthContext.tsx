@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Nie-admin → sprawdź czy recenzent
       let reviewerFlag = false;
       try {
-        const reviewerCheck = await hrApi('check_is_reviewer');
+        const reviewerCheck = await hrApi<{ is_reviewer: boolean }>('check_is_reviewer');
         reviewerFlag = reviewerCheck?.is_reviewer === true;
       } catch {
         // Ignore
